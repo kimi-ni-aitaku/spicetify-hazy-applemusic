@@ -741,17 +741,16 @@
       }
     }
 
-    // 2. Control bar placement: inside album art when open, in ContentBox when closed or compact
-    if (isNowBarOpen && !isCompact) {
-      const mediaContent = page.querySelector(".ContentBox .NowBar .Header .MediaBox .MediaContent");
-      if (mediaContent && vc.parentElement !== mediaContent) {
-        mediaContent.appendChild(vc);
-      }
-    } else {
-      const contentBox = page.querySelector(".ContentBox");
-      if (contentBox && vc.parentElement !== contentBox) {
-        contentBox.appendChild(vc);
-      }
+    // 2. Control bar placement: always keep floating at top right (Never overlay on album art)
+    const contentBox = page.querySelector(".ContentBox") || page;
+    if (contentBox && vc.parentElement !== contentBox) {
+      contentBox.appendChild(vc);
+    }
+
+    // Cancel Settings button (Keep interface ultra-clean)
+    const settingsBtn = vc.querySelector("#SettingsToggle");
+    if (settingsBtn) {
+      settingsBtn.style.setProperty("display", "none", "important");
     }
 
     // 3. Natural Chinese Tooltips
@@ -810,36 +809,9 @@
   spicyObserver.observe(document.body, { childList: true, subtree: true });
 
 
-  // Window Resize Zero-Lag Engine & Zoom Variable
+  // Window Resize Zero-Lag Engine (No DOM style recalculation storms)
   function setupWindowResizeEngine() {
-    let prevZoom = -1;
-    let resizeTimer = null;
-
-    function onResize() {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        const newOuterWidth = window.outerWidth;
-        const newInnerWidth = window.innerWidth;
-        if (newInnerWidth > 0) {
-          const zoomFactor = Math.round((newOuterWidth / newInnerWidth) * 100) / 100 || 1;
-          if (Math.abs(zoomFactor - prevZoom) >= 0.05) {
-            prevZoom = zoomFactor;
-            document.documentElement.style.setProperty("--zoom", zoomFactor);
-          }
-        }
-      }, 100);
-    }
-
-    // Initial calculation
-    const initOuter = window.outerWidth;
-    const initInner = window.innerWidth;
-    if (initInner > 0) {
-      const zoom = Math.round((initOuter / initInner) * 100) / 100 || 1;
-      prevZoom = zoom;
-      document.documentElement.style.setProperty("--zoom", zoom);
-    }
-
-    window.addEventListener("resize", onResize, { passive: true });
+    // Zoom is locked to 1 in CSS root; no dynamic resize listeners needed.
   }
 
   setupWindowResizeEngine();
