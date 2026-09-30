@@ -202,6 +202,11 @@
         // Retry without filters if no color is found
         if (!hexColor) hexColor = findColor(rgbList, true);
 
+        // Apple Music Ambient Fallback for monochrome or ultra-dark covers
+        if (!hexColor || hexColor === "#000000" || hexColor === "#121212") {
+          hexColor = "#546e7a";
+        }
+
         setAccentColor(hexColor);
       };
 
@@ -251,8 +256,8 @@
   // Checks if a color is too dark
   function isTooDark(rgb) {
     const brightness = 0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b;
-    // Adjust this value to control the "darkness" threshold
-    const threshold = 100;
+    // Lower threshold to 60 so rich saturated dark colors are preserved
+    const threshold = 60;
     return brightness < threshold;
   }
 
@@ -518,6 +523,144 @@
     });
   }
 
+  // Apple Music Pure Lyrics Mode: Floating Frosted Bottom Dock
+  function syncPureLyricsBottomBar() {
+    const page = document.getElementById("SpicyLyricsPage");
+    if (!page || !page.classList.contains("Fullscreen")) {
+      const existing = document.getElementById("ApplePureLyricsBottomBar");
+      if (existing) existing.remove();
+      return;
+    }
+
+    const isNoPic = page.classList.contains("NowBarStatus__Closed");
+    let bar = document.getElementById("ApplePureLyricsBottomBar");
+
+    if (!isNoPic) {
+      if (bar) bar.style.display = "none";
+      return;
+    }
+
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "ApplePureLyricsBottomBar";
+      bar.innerHTML = `
+        <div class="PureLyricsMeta">
+          <img class="PureLyricsThumb" src="" alt="" />
+          <div class="PureLyricsDetails">
+            <span class="PureLyricsTitle"></span>
+            <span class="PureLyricsArtist"></span>
+          </div>
+        </div>
+        <div class="PureLyricsCenter">
+          <div class="PureLyricsControls">
+            <button class="PureLyricsBtn btn-shuffle" title="随机播放">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+            </button>
+            <button class="PureLyricsBtn btn-prev" title="上一首">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            </button>
+            <button class="PureLyricsBtn btn-playpause" title="播放 / 暂停">
+              <svg class="icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              <svg class="icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+            </button>
+            <button class="PureLyricsBtn btn-next" title="下一首">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+            </button>
+            <button class="PureLyricsBtn btn-repeat" title="循环播放">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            </button>
+          </div>
+          <div class="PureLyricsTimeline">
+            <span class="PureLyricsTime time-cur">0:00</span>
+            <div class="PureLyricsTrack">
+              <div class="PureLyricsProgress"></div>
+            </div>
+            <span class="PureLyricsTime time-dur">0:00</span>
+          </div>
+        </div>
+      `;
+
+      bar.querySelector(".btn-playpause").addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.playPause();
+      });
+      bar.querySelector(".btn-prev").addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.back();
+      });
+      bar.querySelector(".btn-next").addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.next();
+      });
+      bar.querySelector(".btn-shuffle").addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.toggleShuffle();
+      });
+      bar.querySelector(".btn-repeat").addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.toggleRepeat();
+      });
+
+      const track = bar.querySelector(".PureLyricsTrack");
+      track.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const rect = track.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const dur = Spicetify.Player.getDuration();
+        if (dur > 0) {
+          Spicetify.Player.seek(pct);
+        }
+      });
+
+      page.appendChild(bar);
+    }
+
+    bar.style.display = "flex";
+
+    const item = Spicetify.Player.data?.item;
+    const meta = item?.metadata;
+    if (meta) {
+      const titleEl = bar.querySelector(".PureLyricsTitle");
+      const artistEl = bar.querySelector(".PureLyricsArtist");
+      const thumbEl = bar.querySelector(".PureLyricsThumb");
+
+      if (titleEl) titleEl.textContent = meta.title || "未知曲目";
+      if (artistEl) artistEl.textContent = meta.artist_name || "";
+      if (thumbEl) {
+        let imgUrl = meta.image_url;
+        if (imgUrl && imgUrl.startsWith("spotify:image:")) {
+          imgUrl = imgUrl.replace("spotify:image:", "https://i.scdn.co/image/");
+        }
+        if (imgUrl) {
+          thumbEl.src = imgUrl;
+          thumbEl.style.display = "block";
+        } else {
+          thumbEl.style.display = "none";
+        }
+      }
+    }
+
+    const isPlaying = Spicetify.Player.isPlaying();
+    const playIcon = bar.querySelector(".icon-play");
+    const pauseIcon = bar.querySelector(".icon-pause");
+    if (playIcon && pauseIcon) {
+      playIcon.style.display = isPlaying ? "none" : "block";
+      pauseIcon.style.display = isPlaying ? "block" : "none";
+    }
+
+    const curMs = Spicetify.Player.getProgress() || 0;
+    const durMs = Spicetify.Player.getDuration() || 1;
+    const pct = Math.min(100, Math.max(0, (curMs / durMs) * 100));
+
+    const prog = bar.querySelector(".PureLyricsProgress");
+    if (prog) prog.style.width = `${pct}%`;
+
+    const curTime = bar.querySelector(".time-cur");
+    const durTime = bar.querySelector(".time-dur");
+    if (curTime) curTime.textContent = Spicetify.Player.formatTime(curMs);
+    if (durTime) durTime.textContent = Spicetify.Player.formatTime(durMs);
+  }
+
   function toggleNowBarPictureMode() {
     const page = document.getElementById("SpicyLyricsPage");
     if (!page) return;
@@ -544,8 +687,17 @@
       } catch (e) {}
     }
     syncSpicyControls();
+    syncPureLyricsBottomBar();
     window.dispatchEvent(new Event("resize"));
   }
+
+  // Periodic ticker for Pure Lyrics bottom bar
+  setInterval(() => {
+    const page = document.getElementById("SpicyLyricsPage");
+    if (page && page.classList.contains("Fullscreen") && page.classList.contains("NowBarStatus__Closed")) {
+      syncPureLyricsBottomBar();
+    }
+  }, 400);
 
   let syncScheduled = false;
   function syncSpicyControls() {
@@ -636,15 +788,14 @@
   spicyObserver.observe(document.body, { childList: true, subtree: true });
 
 
-  // Window Zoom Variable (Debounced with deadband threshold to prevent resize stutter)
+  // Window Zoom Variable (Trailing debounce to eliminate resize stutter during dragging)
   function updateZoomVariable() {
     let prevZoom = -1;
     let timer = null;
 
     function calculateAndApplyZoom() {
-      if (timer) return;
+      clearTimeout(timer);
       timer = setTimeout(() => {
-        timer = null;
         const newOuterWidth = window.outerWidth;
         const newInnerWidth = window.innerWidth;
         if (newInnerWidth <= 0) return;
@@ -653,7 +804,7 @@
           prevZoom = zoomFactor;
           document.documentElement.style.setProperty("--zoom", zoomFactor);
         }
-      }, 100);
+      }, 150);
     }
 
     calculateAndApplyZoom();
@@ -942,36 +1093,7 @@
       content.append(toggleRow);
     }
 
-    function createSlider(opt) {
-      let { id, name, min, max, step, defVal, end } = opt;
-      const val = localStorage.getItem(`${id}Amount`) || defVal;
-      const slider = document.createElement("div");
-      slider.classList.add("hazyOptionRow");
-      slider.innerHTML = `
-      <div class="slider-container">
-        <label for="${id}-input">${name}:</label>
-        <input class="slider" id="${id}-input" type="range" min="${min}" max="${max}" step="${step}" value="${val}">
-        <div class="slider-value">
-          <p id="${id}-value" contenteditable="true">${val}${end || "%"}</p>
-        </div>
-      </div>`;
-      slider.querySelector(`#${id}-value`).addEventListener("input", () => {
-        let text = slider.querySelector(`#${id}-value`).textContent.trim();
-        const number = Number.parseInt(text);
-        if (text.length > 4) {
-          text = slider.querySelector(`#${id}-value`).textContent = text.slice(0, 4);
-        }
-        if (!isNaN(number)) {
-          slider.querySelector(`#${id}-input`).value = number;
-        }
-      });
-      slider.querySelector(`#${id}-input`).addEventListener("input", () => {
-        slider.querySelector(`#${id}-value`).textContent = `${
-          slider.querySelector(`#${id}-input`).value
-        }${opt.end || "%"}`;
-      });
-      content.append(slider);
-    }
+
 
     // 1. Toggles (启用自定义背景图 / 启用自定义主题色 / 隐藏正在播放侧边栏)
     toggleInfo.forEach(createToggle);
@@ -1029,11 +1151,7 @@
     colorRow.append(colorLabel, colorInput);
     content.append(colorRow);
 
-    // 4. Sliders (背景模糊度 / 对比度 / 饱和度 / 明亮度)
-    sliders.forEach(createSlider);
-    loadSliders();
-
-    // 5. Buttons Row (Reset & Apply, NO author issue link, NO external link)
+    // Buttons Row (Reset & Apply, NO author issue link, NO external link)
     const buttonsRow = document.createElement("div");
     buttonsRow.style.display = "flex";
     buttonsRow.style.paddingTop = "18px";
@@ -1087,24 +1205,11 @@
             ?.classList.contains("enabled") ?? opt.defVal
         )
       );
-      sliders.forEach((opt) => {
-        const sliderInput = document.querySelector(`.hazyOptionRow #${opt.id}-input`);
-        if (sliderInput) {
-          localStorage.setItem(opt.id + "Amount", sliderInput.value);
-        }
-      });
 
-      loadSliders();
       loadToggles();
     };
 
     resetButton.onclick = () => {
-      sliders.forEach((opt) => {
-        const inp = document.querySelector(`.hazyOptionRow #${opt.id}-input`);
-        const val = document.querySelector(`.hazyOptionRow #${opt.id}-value`);
-        if (inp) inp.value = opt.defVal;
-        if (val) val.textContent = `${opt.defVal}${opt.end || "%"}`;
-      });
       toggleInfo.forEach((opt) => {
         const t = document.querySelector(`.hazyOptionRow[name=${opt.id}] .toggle`);
         if (t) t.classList.toggle("enabled", opt.defVal);

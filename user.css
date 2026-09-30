@@ -105,18 +105,18 @@ ALBUM ART BACKGROUND
   background-repeat: no-repeat;
   background-size: cover;
   background-position: center center;
-  transition: background-image var(--fade-time) ease !important;
   position: fixed;
   display: block;
-  inset: 0;
-  filter: blur(var(--blur)) contrast(var(--cont)) saturate(var(--satu))
-    brightness(var(--bright));
+  inset: -30px;
+  filter: blur(var(--blur, 24px)) contrast(var(--cont, 60%)) saturate(var(--satu, 70%))
+    brightness(var(--bright, 100%));
   pointer-events: none;
   backface-visibility: hidden;
-  will-change: transform;
-  transition: background-image var(--transition);
+  transform: translateZ(0);
+  transition: background-image var(--fade-time, 0.4s) ease !important;
   opacity: 0.55;
   z-index: 0;
+  contain: strict;
 }
 
 /*-------------------------
@@ -649,20 +649,13 @@ SIDEBAR
   background: transparent !important;
 }
 
-/* Main container with sidebar enter transition */
+/* Main container with sidebar width adjustment (no transition to prevent resize stutter) */
 .Root__top-container:has(
     .Root__right-sidebar
       .iXXcc7CtzmTm5yA3ZXbl.hYAxYCXtABXg35wNC2TR.bMaQdOqIiAZtt4cKEhWf:hover
   )
   .Root__main-view {
   width: calc(100% - (var(--panel-gap) * 1.5)) !important;
-
-  transition: width 0.3s ease-in-out !important;
-}
-
-/* Main container with sidebar exit transition */
-.Root__main-view {
-  transition: width 0.5s ease-out, -webkit-transform 0.5s ease-out !important;
 }
 
 /*--------
@@ -3773,3 +3766,229 @@ button[data-testid="trashbin-button"],
   padding: 0 16px !important;
   letter-spacing: normal !important;
 }
+
+/* =========================================================================
+   10. Apple Music Pure Lyrics Mode: Floating Frosted Bottom Dock
+   ========================================================================= */
+#ApplePureLyricsBottomBar {
+  position: fixed !important;
+  bottom: 28px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 16px !important;
+  padding: 8px 18px 8px 12px !important;
+  border-radius: 9999px !important;
+  background: rgba(18, 18, 24, 0.68) !important;
+  backdrop-filter: blur(32px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1), transform 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  min-width: 480px !important;
+  max-width: 640px !important;
+}
+
+/* Show ONLY in Pure Lyrics (No-Picture) Mode */
+#SpicyLyricsPage:not(.NowBarStatus__Closed) #ApplePureLyricsBottomBar {
+  display: none !important;
+}
+
+#SpicyLyricsPage.is-inactive #ApplePureLyricsBottomBar {
+  opacity: 0 !important;
+  transform: translateX(-50%) translateY(18px) !important;
+  pointer-events: none !important;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsMeta {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  max-width: 170px !important;
+  overflow: hidden !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsThumb {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  object-fit: cover !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsDetails {
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsTitle {
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  color: #ffffff !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+  letter-spacing: -0.01em !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsArtist {
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsCenter {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  flex: 1 !important;
+  gap: 4px !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsControls {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsBtn {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  cursor: pointer !important;
+  padding: 4px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.18s ease !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsBtn:hover {
+  transform: scale(1.15) !important;
+  color: #ffffff !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsBtn.btn-playpause {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-radius: 50% !important;
+  width: 32px !important;
+  height: 32px !important;
+  color: #ffffff !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsBtn.btn-playpause:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+  transform: scale(1.1) !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsTimeline {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  gap: 8px !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsTime {
+  font-size: 0.68rem !important;
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-variant-numeric: tabular-nums !important;
+  min-width: 28px !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsTrack {
+  flex: 1 !important;
+  height: 4px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-radius: 9999px !important;
+  cursor: pointer !important;
+  position: relative !important;
+  overflow: hidden !important;
+  transition: height 0.15s ease !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsTrack:hover {
+  height: 6px !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsProgress {
+  height: 100% !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-radius: 9999px !important;
+  pointer-events: none !important;
+  transition: width 0.1s linear !important;
+}
+
+/* =========================================================================
+   11. Bilingual Translation & Japanese Furigana/Romaji Typography
+   ========================================================================= */
+#SpicyLyricsPage .line .translation,
+#SpicyLyricsPage .line .sublyric,
+#SpicyLyricsPage .line .SubLyric,
+#SpicyLyricsPage .line [class*="ranslat"] {
+  display: block !important;
+  font-size: 0.72em !important;
+  font-weight: 500 !important;
+  line-height: 1.45 !important;
+  margin-top: 5px !important;
+  letter-spacing: -0.01em !important;
+  opacity: 0.62 !important;
+  transition: opacity 0.35s ease, color 0.35s ease, text-shadow 0.35s ease !important;
+}
+
+#SpicyLyricsPage .line.Active .translation,
+#SpicyLyricsPage .line.Active .sublyric,
+#SpicyLyricsPage .line.Active .SubLyric,
+#SpicyLyricsPage .line.Active [class*="ranslat"] {
+  opacity: 0.88 !important;
+  color: rgba(255, 255, 255, 0.94) !important;
+  text-shadow: 0 0 14px rgba(255, 255, 255, 0.18) !important;
+}
+
+/* Furigana & Romaji Annotations */
+#SpicyLyricsPage .line ruby {
+  ruby-align: center !important;
+  ruby-position: over !important;
+}
+
+#SpicyLyricsPage .line rt,
+#SpicyLyricsPage .line [class*="furigana"],
+#SpicyLyricsPage .line [class*="romaji"] {
+  font-size: 0.44em !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.02em !important;
+  opacity: 0.72 !important;
+  transform: translateY(-2px) !important;
+  user-select: none !important;
+  transition: opacity 0.35s ease, color 0.35s ease !important;
+}
+
+#SpicyLyricsPage .line.Active rt,
+#SpicyLyricsPage .line.Active [class*="furigana"],
+#SpicyLyricsPage .line.Active [class*="romaji"] {
+  opacity: 0.95 !important;
+  color: rgba(255, 255, 255, 0.92) !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.22) !important;
+}
+
+/* =========================================================================
+   12. Ambient Lighting Base Layer (Anti-Dead-Dark Background)
+   ========================================================================= */
+#SpicyLyricsPage.Fullscreen::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: radial-gradient(circle at 25% 30%, rgba(30, 38, 56, 0.42) 0%, transparent 65%),
+              radial-gradient(circle at 80% 70%, rgba(42, 28, 52, 0.38) 0%, transparent 65%) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
