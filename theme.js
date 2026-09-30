@@ -359,25 +359,7 @@
     true
   );
 
-  // Suppress all playbar lyrics buttons (including far-right microphone button)
-  function hidePlaybarLyricsButtons() {
-    const ids = ["SpicyLyrics_FullscreenButton", "SpicyLyrics_PopupLyricsButton", "SpicyLyrics_PageButton"];
-    ids.forEach((id) => {
-      const btn = document.getElementById(id);
-      if (btn && btn.style.display !== "none") {
-        btn.style.setProperty("display", "none", "important");
-      }
-    });
-    const nativeBtns = document.querySelectorAll(
-      'button[aria-label="歌词"], button[data-testid="lyrics-button"], button.BCyglZU3nRFZ5tXW1Q2Q'
-    );
-    nativeBtns.forEach((btn) => {
-      if (btn && btn.style.display !== "none") {
-        btn.style.setProperty("display", "none", "important");
-      }
-    });
-  }
-  setInterval(hidePlaybarLyricsButtons, 600);
+
 
   // Press ESC to exit fullscreen lyrics
   document.addEventListener("keydown", (e) => {
@@ -711,14 +693,15 @@
     window.dispatchEvent(new Event("resize"));
   }
 
-  // Periodic ticker for Pure Lyrics bottom bar
+  // Periodic ticker for Pure Lyrics bottom bar (fast-path early exit when not active)
   setInterval(() => {
-    if (document.body.classList.contains("is-resizing")) return;
+    const bar = document.getElementById("ApplePureLyricsBottomBar");
+    if (!bar || bar.style.display === "none") return;
     const page = document.getElementById("SpicyLyricsPage");
     if (page && page.classList.contains("Fullscreen") && page.classList.contains("NowBarStatus__Closed")) {
       syncPureLyricsBottomBar();
     }
-  }, 400);
+  }, 500);
 
   let syncScheduled = false;
   function syncSpicyControls() {
@@ -793,7 +776,25 @@
   }
 
   // Observer for SpicyLyrics elements & Settings Modal translations
-  const spicyObserver = new MutationObserver(() => {
+  const spicyObserver = new MutationObserver((mutations) => {
+    let relevant = false;
+    for (let i = 0; i < mutations.length; i++) {
+      const m = mutations[i];
+      if (m.target && (m.target.id === "SpicyLyricsPage" || m.target.classList?.contains("ViewControls") || m.target.tagName === "SL-GENERIC-MODAL")) {
+        relevant = true;
+        break;
+      }
+      for (let j = 0; j < m.addedNodes.length; j++) {
+        const node = m.addedNodes[j];
+        if (node.nodeType === 1 && (node.id === "SpicyLyricsPage" || node.tagName === "SL-GENERIC-MODAL" || node.classList?.contains("SpicyLyricsModal"))) {
+          relevant = true;
+          break;
+        }
+      }
+      if (relevant) break;
+    }
+    if (!relevant) return;
+
     if (!syncScheduled) {
       syncScheduled = true;
       requestAnimationFrame(() => {
@@ -815,16 +816,8 @@
     let resizeTimer = null;
 
     function onResize() {
-      // 1. Immediately toggle is-resizing to disable all CSS transitions/animations across the DOM
-      if (!document.body.classList.contains("is-resizing")) {
-        document.body.classList.add("is-resizing");
-      }
-
-      // 2. Trailing debounce (100ms) to re-enable transitions and calculate zoom when drag stops
       clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        document.body.classList.remove("is-resizing");
-
         const newOuterWidth = window.outerWidth;
         const newInnerWidth = window.innerWidth;
         if (newInnerWidth > 0) {
@@ -887,7 +880,6 @@
 
   waitForElement([".main-view-container"], ([mainViewContainer]) => {
     const mainViewContainerResizeObserver = new ResizeObserver(() => {
-      if (document.body.classList.contains("is-resizing")) return;
       if (!document.querySelector(".Root__lyrics-cinema, .lyrics-lyrics-contentWrapper")) return;
       updateLyricsPageProperties();
     });
@@ -993,7 +985,7 @@
     window.addEventListener(
       "scroll",
       (event) => {
-        if (document.body.classList.contains("is-resizing") || document.querySelector("#SpicyLyricsPage.Fullscreen")) return;
+        if (document.querySelector("#SpicyLyricsPage.Fullscreen")) return;
         const target = event.target;
         if (!target || target === document || target === window) return;
 
@@ -1106,7 +1098,21 @@
   }; */
 
   // Clean User Avatar Context Menu (Keep only Profile, Settings, and Log Out)
-  const menuObserver = new MutationObserver(() => {
+  const menuObserver = new MutationObserver((mutations) => {
+    let hasMenu = false;
+    for (let i = 0; i < mutations.length; i++) {
+      const m = mutations[i];
+      for (let j = 0; j < m.addedNodes.length; j++) {
+        const node = m.addedNodes[j];
+        if (node.nodeType === 1 && (node.getAttribute?.("role") === "menu" || node.querySelector?.('[role="menu"]'))) {
+          hasMenu = true;
+          break;
+        }
+      }
+      if (hasMenu) break;
+    }
+    if (!hasMenu) return;
+
     const menus = document.querySelectorAll('[role="menu"]');
     if (!menus.length) return;
 

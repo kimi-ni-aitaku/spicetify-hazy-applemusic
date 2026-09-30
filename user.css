@@ -1,25 +1,13 @@
 /* =========================================================================
-   Zero-Lag Window Drag & Resize Engine
-   Completely suspends all transitions, animations, backdrop-filters & shadows while window is resizing
+   Performance Optimization: Clean CSS button suppression & zero GPU overdraw
    ========================================================================= */
-body.is-resizing,
-body.is-resizing *,
-body.is-resizing *::before,
-body.is-resizing *::after {
-  transition: none !important;
-  animation-duration: 0.001ms !important;
-}
-
-body.is-resizing .Root__main-view,
-body.is-resizing .main-view-container,
-body.is-resizing .Root__nav-bar,
-body.is-resizing .Root__right-sidebar,
-body.is-resizing .Root__now-playing-bar,
-body.is-resizing .main-yourLibraryX-libraryContainer,
-body.is-resizing .main-topBar-background {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
+#SpicyLyrics_FullscreenButton,
+#SpicyLyrics_PopupLyricsButton,
+#SpicyLyrics_PageButton,
+button[aria-label="歌词"],
+button[data-testid="lyrics-button"],
+button.BCyglZU3nRFZ5tXW1Q2Q {
+  display: none !important;
 }
 
 :root {
@@ -136,7 +124,8 @@ ALBUM ART BACKGROUND
     brightness(var(--bright, 100%));
   pointer-events: none;
   backface-visibility: hidden;
-  transform: translateZ(0);
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
   transition: background-image var(--fade-time, 0.4s) ease !important;
   opacity: 0.55;
   z-index: 0;
@@ -188,7 +177,7 @@ NAVIGATION BAR
 }
 
 .TkqXOzhmCCuE6YI3hlgA, .WBFaUw_oOfN2m4aTxggt {
-  backdrop-filter: blur(20px);
+  backdrop-filter: none;
 }
 
 .Root__nav-bar [fade="top"] {
@@ -270,7 +259,7 @@ YOUR LIBRARY
   background-color: transparent;
 }
 #Desktop_LeftSidebar_Id.yXlTmwlWtDebsivA1gM6 {
-  backdrop-filter: blur(25px) !important;
+  backdrop-filter: none !important;
   width: calc(100% + var(--panel-gap))
 }
 
@@ -793,7 +782,7 @@ PLAYLIST VIEW
 
 .main-trackList-trackListHeader {
   box-shadow: none !important;
-  backdrop-filter: blur(8px) !important;
+  backdrop-filter: none !important;
 }
 
 .main-trackList-trackListRow:focus-within,
@@ -1015,7 +1004,7 @@ TOP BAR
 
 .main-topBar-background {
   background: none;
-  backdrop-filter: blur(25px) !important;
+  backdrop-filter: none !important;
 }
 
 .main-topBar-overlay {
@@ -3084,7 +3073,7 @@ body.__hazy_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar 
   --panel-gap: 10px !important;
 }
 
-/* Main View, Library, and Sidebars */
+/* Main View, Library, and Sidebars: Silky-smooth glass with ambient background pass-through */
 .Root__main-view,
 .main-yourLibraryX-entryPoints,
 .main-yourLibraryX-libraryContainer,
@@ -3092,8 +3081,9 @@ body.__hazy_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar 
 .Root__right-sidebar {
   border-radius: 18px !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  backdrop-filter: blur(30px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(180%) !important;
+  background: rgba(20, 20, 24, 0.45) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   overflow: hidden !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25) !important;
 }
@@ -3108,14 +3098,14 @@ body.__hazy_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar 
   background-color: transparent !important;
 }
 
-/* Floating Island Now-Playing Bar (底栏浮岛毛玻璃胶囊) */
+/* Floating Island Now-Playing Bar (底栏浮岛毛玻璃胶囊 - 零开销高帧率渲染) */
 .Root__now-playing-bar {
   border-radius: 20px !important;
   margin: 0 12px 12px 12px !important;
   border: 1px solid rgba(255, 255, 255, 0.18) !important;
-  background: rgba(20, 20, 25, 0.55) !important;
-  backdrop-filter: blur(35px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(35px) saturate(200%) !important;
+  background: rgba(20, 20, 26, 0.65) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35) !important;
 }
 
@@ -3201,8 +3191,8 @@ body.__hazy_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar 
 /* Spotify Latest Native Lyrics Container */
 .bqldaBkacR41KxR2Z0jY {
   background: rgba(10, 12, 18, 0.22) !important;
-  backdrop-filter: blur(20px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   border-radius: 20px !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35) !important;
@@ -3218,8 +3208,8 @@ body.__hazy_hidenowplayingsidebar .Root__top-container:has(.Root__right-sidebar 
 .lyrics-lyrics-container,
 .lyrics-lyricsContainer-LyricsContainer {
   background: rgba(10, 12, 18, 0.22) !important;
-  backdrop-filter: blur(20px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(200%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   border-radius: 20px !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.35) !important;
@@ -3732,55 +3722,7 @@ button[data-testid="trashbin-button"],
   transform: scale(1.22) !important;
 }
 
-/* 6. Apple Music Typography & Progressive Depth for Lyrics (Zero-Lag Optimized) */
-#SpicyLyricsPage .line {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
-  letter-spacing: -0.015em !important;
-  transition: opacity 0.35s ease, color 0.35s ease, text-shadow 0.35s ease !important;
-  will-change: auto !important;
-}
 
-/* Active Highlight Line */
-#SpicyLyricsPage .line.Active {
-  opacity: 1 !important;
-  filter: none !important;
-  text-shadow: 0 0 24px rgba(255, 255, 255, 0.28), 0 2px 10px rgba(0, 0, 0, 0.35) !important;
-}
-
-/* Inactive Sung Lines (Pure crisp opacity hierarchy, no GPU-thrashing blur) */
-#SpicyLyricsPage .line.Sung {
-  opacity: 0.32 !important;
-  filter: none !important;
-}
-
-/* Inactive NotSung Lines */
-#SpicyLyricsPage .line.NotSung {
-  opacity: 0.44 !important;
-  filter: none !important;
-}
-
-/* Interactive hover on any line */
-#SpicyLyricsPage .line:not(.Active):hover {
-  opacity: 0.85 !important;
-  filter: none !important;
-  cursor: pointer !important;
-}
-
-/* Eliminate Layout Transition Thrashing in SpicyLyrics Containers */
-#SpicyLyricsPage,
-#SpicyLyricsPage .CenteredView,
-#SpicyLyricsPage .Header,
-#SpicyLyricsPage .MediaBox,
-#SpicyLyricsPage .MediaContent,
-#SpicyLyricsPage .MediaImageContainer,
-#SpicyLyricsPage .LyricsContent,
-#SpicyLyricsPage .SpicyLyricsScrollContainer,
-#SpicyLyricsPage .ContentBox,
-#SpicyLyricsPage .NowBar,
-#SpicyLyricsPage .ib_ImageBox,
-#SpicyLyricsPage .word {
-  transition-property: opacity, color, text-shadow !important;
-}
 
 /* Hide promotional/author links in Settings Modal */
 .sl-sp-footer-link,
@@ -3979,57 +3921,7 @@ button[data-testid="trashbin-button"],
   transition: width 0.1s linear !important;
 }
 
-/* =========================================================================
-   11. Bilingual Translation & Japanese Furigana/Romaji Typography
-   ========================================================================= */
-#SpicyLyricsPage .line .translation,
-#SpicyLyricsPage .line .sublyric,
-#SpicyLyricsPage .line .SubLyric,
-#SpicyLyricsPage .line [class*="ranslat"] {
-  display: block !important;
-  font-size: 0.72em !important;
-  font-weight: 500 !important;
-  line-height: 1.45 !important;
-  margin-top: 5px !important;
-  letter-spacing: -0.01em !important;
-  opacity: 0.62 !important;
-  transition: opacity 0.35s ease, color 0.35s ease, text-shadow 0.35s ease !important;
-}
 
-#SpicyLyricsPage .line.Active .translation,
-#SpicyLyricsPage .line.Active .sublyric,
-#SpicyLyricsPage .line.Active .SubLyric,
-#SpicyLyricsPage .line.Active [class*="ranslat"] {
-  opacity: 0.88 !important;
-  color: rgba(255, 255, 255, 0.94) !important;
-  text-shadow: 0 0 14px rgba(255, 255, 255, 0.18) !important;
-}
-
-/* Furigana & Romaji Annotations */
-#SpicyLyricsPage .line ruby {
-  ruby-align: center !important;
-  ruby-position: over !important;
-}
-
-#SpicyLyricsPage .line rt,
-#SpicyLyricsPage .line [class*="furigana"],
-#SpicyLyricsPage .line [class*="romaji"] {
-  font-size: 0.44em !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.02em !important;
-  opacity: 0.72 !important;
-  transform: translateY(-2px) !important;
-  user-select: none !important;
-  transition: opacity 0.35s ease, color 0.35s ease !important;
-}
-
-#SpicyLyricsPage .line.Active rt,
-#SpicyLyricsPage .line.Active [class*="furigana"],
-#SpicyLyricsPage .line.Active [class*="romaji"] {
-  opacity: 0.95 !important;
-  color: rgba(255, 255, 255, 0.92) !important;
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.22) !important;
-}
 
 /* =========================================================================
    12. Ambient Lighting Base Layer (Anti-Dead-Dark Background)
