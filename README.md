@@ -61,10 +61,6 @@
 | :---: | :---: |
 | ![经典分栏](./screenshots/fullscreen_preview.png) | ![无图模式](./screenshots/no_picture_preview.png) |
 
-| 极简原生主界面与精简播放栏 | 全中文歌词设置 |
-| :---: | :---: |
-| ![主界面](./screenshots/main_view_preview.png) | ![全中文设置](./screenshots/settings_preview.png) |
-
 ---
 
 ## 🚀 一键安装与使用指南
