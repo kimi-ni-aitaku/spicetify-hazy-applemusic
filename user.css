@@ -3637,6 +3637,12 @@ button[data-testid="trashbin-button"],
   --LyricsRightSidePadding: 0px !important;
 }
 
+#SpicyLyricsPage.Fullscreen:not(.NowBarStatus__Closed) {
+  --NowBarWidth: clamp(280px, 42cqw, 480px) !important;
+  --NowBarLeftSpacing: calc(max(24px, (48cqw - var(--NowBarWidth)) / 2)) !important;
+  --LyricsLeftSidePadding: calc(var(--NowBarLeftSpacing) + var(--NowBarWidth) + 32px) !important;
+}
+
 #SpicyLyricsPage.Fullscreen:not(.NowBarStatus__Closed) .ContentBox .NowBar.Active {
   padding-top: 0 !important;
   margin-top: 0 !important;
@@ -3681,12 +3687,12 @@ button[data-testid="trashbin-button"],
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox,
 #SpicyLyricsPage.Fullscreen.CompactMode .ContentBox .NowBar .Header .MediaBox {
   order: 1 !important;
-  width: min(380px, 86cqw, 42cqh) !important;
-  height: min(380px, 86cqw, 42cqh) !important;
-  max-width: 400px !important;
-  max-height: 400px !important;
-  min-width: 140px !important;
-  min-height: 140px !important;
+  width: min(440px, 88cqw, 46cqh) !important;
+  height: min(440px, 88cqw, 46cqh) !important;
+  max-width: 460px !important;
+  max-height: 460px !important;
+  min-width: 160px !important;
+  min-height: 160px !important;
   aspect-ratio: 1 / 1 !important;
   flex-shrink: 0 !important;
   margin: 0 auto !important;
@@ -3728,8 +3734,8 @@ button[data-testid="trashbin-button"],
   justify-content: center !important;
   text-align: center !important;
   margin: 16px 0 10px 0 !important;
-  width: min(380px, 86cqw, 42cqh) !important;
-  max-width: 400px !important;
+  width: min(440px, 88cqw, 46cqh) !important;
+  max-width: 460px !important;
   padding: 0 !important;
   position: static !important;
   flex-shrink: 0 !important;
@@ -3775,8 +3781,8 @@ button[data-testid="trashbin-button"],
   flex-direction: row !important;
   align-items: center !important;
   justify-content: space-between !important;
-  width: min(380px, 86cqw, 42cqh) !important;
-  max-width: 400px !important;
+  width: min(440px, 88cqw, 46cqh) !important;
+  max-width: 460px !important;
   margin: 0 auto 14px auto !important;
   padding: 0 !important;
   gap: 10px !important;
@@ -3902,7 +3908,7 @@ button[data-testid="trashbin-button"],
   flex-direction: row !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 26px !important;
+  gap: 22px !important;
   width: auto !important;
   height: auto !important;
   margin: 0 auto !important;
@@ -3938,42 +3944,78 @@ button[data-testid="trashbin-button"],
   transform: scale(0.92) !important;
 }
 
-/* Shuffle & Loop */
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .ShuffleToggle,
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .LoopToggle {
-  width: 32px !important;
-  height: 32px !important;
-  opacity: 0.5 !important;
+/* Play Mode 3-in-1 (Order / Shuffle / Loop) */
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayModeToggle {
+  width: 34px !important;
+  height: 34px !important;
+  opacity: 0.6 !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.2, 0, 0, 1), color 0.18s ease !important;
 }
 
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .ShuffleToggle:hover,
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .LoopToggle:hover {
-  opacity: 0.9 !important;
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayModeToggle:hover {
+  opacity: 0.95 !important;
+  color: #ffffff !important;
+  transform: scale(1.1) !important;
 }
 
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .ShuffleToggle.Enabled,
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .LoopToggle.Enabled {
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayModeToggle:active {
+  transform: scale(0.92) !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayModeToggle.Enabled {
   opacity: 1 !important;
-  color: var(--spice-accent, #fa586a) !important;
+  color: #ff385c !important; /* Apple Music iconic accent */
 }
 
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .ShuffleToggle svg,
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .LoopToggle svg {
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayModeToggle svg,
+#ApplePureLyricsBottomBar .PureLyricsBtn.btn-playmode svg {
   width: 20px !important;
   height: 20px !important;
-  fill: currentColor !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 2.2px !important;
 }
 
-/* Track Skip (Prev / Next) */
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayControlsSpacer {
+  width: 34px !important;
+  height: 34px !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+/* Track Skip (Prev / Next) - PrevTrack is rotated 180deg to face left */
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .TrackSkip {
   width: 38px !important;
   height: 38px !important;
+  flex-shrink: 0 !important;
 }
 
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .TrackSkip svg {
   width: 26px !important;
   height: 18px !important;
   fill: currentColor !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PrevTrack {
+  transform: rotate(180deg) !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PrevTrack:hover {
+  transform: rotate(180deg) scale(1.12) !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PrevTrack:active {
+  transform: rotate(180deg) scale(0.92) !important;
 }
 
 /* Play / Pause - Apple Iconic Circular Frosted Disc */
@@ -3986,6 +4028,7 @@ button[data-testid="trashbin-button"],
   -webkit-backdrop-filter: blur(16px) !important;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.12) !important;
   color: #ffffff !important;
+  flex-shrink: 0 !important;
 }
 
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .PlaybackControls .PlayStateToggle:hover {
@@ -4179,6 +4222,10 @@ button[data-testid="trashbin-button"],
 #ApplePureLyricsBottomBar .PureLyricsBtn:hover {
   transform: scale(1.15) !important;
   color: #ffffff !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsBtn.btn-playmode.Enabled {
+  color: #ff385c !important;
 }
 
 #ApplePureLyricsBottomBar .PureLyricsBtn.btn-playpause {

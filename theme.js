@@ -267,23 +267,80 @@
     return rgb.r > threshold && rgb.g > threshold && rgb.b > threshold;
   }
 
+  // Ensure SpicyLyrics never drops into CompactMode on narrow/resized windows, preserving vertical center lyrics
+  (function patchMatchMediaForSpicyLyrics() {
+    const origMatchMedia = window.matchMedia;
+    if (!origMatchMedia || window.__matchMediaPatchedForSpicy) return;
+    window.__matchMediaPatchedForSpicy = true;
+
+    window.matchMedia = function (query) {
+      if (typeof query === "string" && query.includes("70.812rem")) {
+        const res = origMatchMedia.call(this, query);
+        return new Proxy(res, {
+          get(target, prop) {
+            if (prop === "matches") return false;
+            return typeof target[prop] === "function" ? target[prop].bind(target) : target[prop];
+          }
+        });
+      }
+      return origMatchMedia.call(this, query);
+    };
+  })();
+
   // Optimistic Seek Wrapper: Prevents Spotify async seek position snapback / jitter
+  let optimisticProgress = null;
+  let optimisticUntil = 0;
+
+  function applyOptimisticSeek(targetMs) {
+    optimisticProgress = targetMs;
+    optimisticUntil = Date.now() + 1200;
+    const dur = Spicetify.Player.getDuration() || 1;
+    const pct = Math.max(0, Math.min(1, targetMs / dur));
+    document.querySelectorAll("#SpicyLyricsPage .SliderBar").forEach((sb) => {
+      sb.style.setProperty("--SliderProgress", pct.toString());
+    });
+    document.querySelectorAll("#SpicyLyricsPage .NowBar .Timeline .Time.Position").forEach((el) => {
+      el.textContent = Spicetify.Player.formatTime(targetMs);
+    });
+  }
+
+  function protectSliderBar(sb) {
+    if (!sb || sb.__protectInstalled) return;
+    sb.__protectInstalled = true;
+    const origSetProperty = sb.style.setProperty.bind(sb.style);
+    sb.style.setProperty = function (prop, val, prio) {
+      if (prop === "--SliderProgress" && optimisticProgress !== null && Date.now() < optimisticUntil) {
+        const dur = Spicetify.Player.getDuration() || 1;
+        const targetPct = optimisticProgress / dur;
+        const incoming = parseFloat(val);
+        if (!isNaN(incoming) && Math.abs(incoming - targetPct) > 0.03) {
+          return origSetProperty(prop, targetPct.toString(), prio);
+        }
+      }
+      return origSetProperty(prop, val, prio);
+    };
+  }
+
   function installOptimisticSeekWrapper() {
     if (!Spicetify?.Player?.seek || !Spicetify?.Player?.getProgress) return;
     if (Spicetify.Player.__optimisticSeekInstalled) return;
     Spicetify.Player.__optimisticSeekInstalled = true;
 
-    let optimisticProgress = null;
-    let optimisticUntil = 0;
-
     const origSeek = Spicetify.Player.seek;
     Spicetify.Player.seek = function (count) {
       const duration = Spicetify.Player.getDuration() || 0;
       const targetMs = count <= 1 && duration > 0 ? Math.round(count * duration) : Math.round(count);
-      optimisticProgress = targetMs;
-      optimisticUntil = Date.now() + 1500;
+      applyOptimisticSeek(targetMs);
       return origSeek.call(this, count);
     };
+
+    if (Spicetify.Player.origin?.seekTo) {
+      const origSeekTo = Spicetify.Player.origin.seekTo.bind(Spicetify.Player.origin);
+      Spicetify.Player.origin.seekTo = function (ms) {
+        applyOptimisticSeek(Math.round(ms));
+        return origSeekTo(ms);
+      };
+    }
 
     const origGetProgress = Spicetify.Player.getProgress;
     Spicetify.Player.getProgress = function () {
@@ -318,6 +375,25 @@
   document.addEventListener("click", (event) => {
     if (event.target.closest(".main-entityHeader-topbarTitle")) scrollToTop();
   });
+
+  // Auto-play when user clicks a lyric line while playback is paused
+  document.addEventListener(
+    "click",
+    (event) => {
+      const line = event.target.closest(
+        "#SpicyLyricsPage .LyricsContent .line, #SpicyLyricsPage .LyricsContent .word, #SpicyLyricsPage .LyricsContent .letter"
+      );
+      if (!line) return;
+      if (!Spicetify?.Player?.isPlaying?.()) {
+        setTimeout(() => {
+          if (!Spicetify?.Player?.isPlaying?.()) {
+            Spicetify?.Player?.play?.();
+          }
+        }, 50);
+      }
+    },
+    true
+  );
 
   // Track last non-lyrics route to ensure robust back navigation
   let lastNonLyricsRoute = "/";
@@ -561,6 +637,61 @@
     });
   }
 
+  // 3-State Playback Mode Cycler: 顺序播放 -> 随机播放 -> 循环播放 -> 顺序播放
+  function cyclePlayMode() {
+    const isShuffle = !!Spicetify.Player.getShuffle?.();
+    const repeat = Spicetify.Player.getRepeat?.() || 0;
+
+    if (isShuffle) {
+      // Shuffle -> Loop
+      Spicetify.Player.setShuffle(false);
+      Spicetify.Player.setRepeat(1);
+    } else if (repeat > 0) {
+      // Loop -> Order (Sequential)
+      Spicetify.Player.setShuffle(false);
+      Spicetify.Player.setRepeat(0);
+    } else {
+      // Order -> Shuffle
+      Spicetify.Player.setShuffle(true);
+      Spicetify.Player.setRepeat(0);
+    }
+    updatePlayModeUI();
+    setTimeout(() => {
+      updatePlayModeUI();
+    }, 60);
+  }
+
+  function updatePlayModeUI(root = document) {
+    const isShuffle = !!Spicetify.Player.getShuffle?.();
+    const repeat = Spicetify.Player.getRepeat?.() || 0;
+
+    let mode = "order";
+    if (isShuffle) mode = "shuffle";
+    else if (repeat > 0) mode = "loop";
+
+    const title = mode === "order" ? "顺序播放" : mode === "shuffle" ? "随机播放" : "循环播放";
+
+    const targets = root.matches?.(".PlayModeToggle, .btn-playmode")
+      ? [root]
+      : Array.from(root.querySelectorAll?.(".PlayModeToggle, .btn-playmode") || []);
+
+    targets.forEach((btn) => {
+      btn.classList.toggle("mode-order", mode === "order");
+      btn.classList.toggle("mode-shuffle", mode === "shuffle");
+      btn.classList.toggle("mode-loop", mode === "loop");
+      btn.classList.toggle("Enabled", mode !== "order");
+      btn.setAttribute("title", title);
+      btn.setAttribute("aria-label", title);
+
+      const orderSvg = btn.querySelector(".mode-icon-order");
+      const shuffleSvg = btn.querySelector(".mode-icon-shuffle");
+      const loopSvg = btn.querySelector(".mode-icon-loop");
+      if (orderSvg) orderSvg.style.display = mode === "order" ? "block" : "none";
+      if (shuffleSvg) shuffleSvg.style.display = mode === "shuffle" ? "block" : "none";
+      if (loopSvg) loopSvg.style.display = mode === "loop" ? "block" : "none";
+    });
+  }
+
   // Apple Music Pure Lyrics Mode: Floating Frosted Bottom Dock
   function syncPureLyricsBottomBar() {
     const page = document.getElementById("SpicyLyricsPage");
@@ -591,8 +722,10 @@
         </div>
         <div class="PureLyricsCenter">
           <div class="PureLyricsControls">
-            <button class="PureLyricsBtn btn-shuffle" title="随机播放">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+            <button class="PureLyricsBtn btn-playmode" title="播放模式">
+              <svg class="mode-icon-order" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="7" x2="18" y2="7"/><polyline points="15 4 18 7 15 10"/><line x1="3" y1="17" x2="18" y2="17"/><polyline points="15 14 18 17 15 20"/></svg>
+              <svg class="mode-icon-shuffle" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+              <svg class="mode-icon-loop" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
             </button>
             <button class="PureLyricsBtn btn-prev" title="上一首">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
@@ -603,9 +736,6 @@
             </button>
             <button class="PureLyricsBtn btn-next" title="下一首">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
-            </button>
-            <button class="PureLyricsBtn btn-repeat" title="循环播放">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
             </button>
           </div>
           <div class="PureLyricsTimeline">
@@ -618,6 +748,10 @@
         </div>
       `;
 
+      bar.querySelector(".btn-playmode").addEventListener("click", (e) => {
+        e.stopPropagation();
+        cyclePlayMode();
+      });
       bar.querySelector(".btn-playpause").addEventListener("click", (e) => {
         e.stopPropagation();
         Spicetify.Player.playPause();
@@ -629,14 +763,6 @@
       bar.querySelector(".btn-next").addEventListener("click", (e) => {
         e.stopPropagation();
         Spicetify.Player.next();
-      });
-      bar.querySelector(".btn-shuffle").addEventListener("click", (e) => {
-        e.stopPropagation();
-        Spicetify.Player.toggleShuffle();
-      });
-      bar.querySelector(".btn-repeat").addEventListener("click", (e) => {
-        e.stopPropagation();
-        Spicetify.Player.toggleRepeat();
       });
 
       const track = bar.querySelector(".PureLyricsTrack");
@@ -773,10 +899,13 @@
 
     installOptimisticSeekWrapper();
 
-    // Prevent SpicyLyrics CompactMode from breaking desktop fullscreen layout
-    if (page.classList.contains("Fullscreen")) {
-      if (page.classList.contains("CompactMode") || page.classList.contains("CompactifyEnabledCompactMode") || page.classList.contains("ForcedCompactMode")) {
-        page.classList.remove("CompactMode", "CompactifyEnabledCompactMode", "ForcedCompactMode");
+    // Clean up stuck compact mode so lyrics stay vertically centered
+    if (page.classList.contains("CompactMode") || page.classList.contains("ForcedCompactMode")) {
+      const compactBtn = document.getElementById("CompactModeToggle");
+      if (compactBtn) {
+        compactBtn.click();
+      } else {
+        page.classList.remove("CompactMode", "ForcedCompactMode", "CompactifyEnabledCompactMode");
       }
     }
 
@@ -790,13 +919,18 @@
       }
     }
 
+    // Protect timeline slider bars from being overwritten by async unsynced position poll
+    page.querySelectorAll(".SliderBar").forEach(protectSliderBar);
+
     // Ensure PlaybackControls exists in header
     if (!pc && header) {
       pc = document.createElement("div");
       pc.className = "PlaybackControls";
       pc.innerHTML = `
-        <button class="PlaybackControl ShuffleToggle" title="随机播放">
-          <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+        <button class="PlaybackControl PlayModeToggle" id="PlayModeToggle" title="播放模式">
+          <svg class="mode-icon-order" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="7" x2="18" y2="7"/><polyline points="15 4 18 7 15 10"/><line x1="3" y1="17" x2="18" y2="17"/><polyline points="15 14 18 17 15 20"/></svg>
+          <svg class="mode-icon-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+          <svg class="mode-icon-loop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
         </button>
         <button class="PlaybackControl TrackSkip PrevTrack" title="上一首">
           <svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -808,13 +942,11 @@
         <button class="PlaybackControl TrackSkip NextTrack" title="下一首">
           <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
         </button>
-        <button class="PlaybackControl LoopToggle" title="循环播放">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        </button>
+        <div class="PlayControlsSpacer"></div>
       `;
-      pc.querySelector(".ShuffleToggle")?.addEventListener("click", (e) => {
+      pc.querySelector(".PlayModeToggle")?.addEventListener("click", (e) => {
         e.stopPropagation();
-        Spicetify.Player.toggleShuffle();
+        cyclePlayMode();
       });
       pc.querySelector(".PrevTrack")?.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -828,13 +960,45 @@
         e.stopPropagation();
         Spicetify.Player.next();
       });
-      pc.querySelector(".LoopToggle")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        Spicetify.Player.toggleRepeat();
-      });
     }
 
     if (pc) {
+      // 1. Remove separate shuffle/loop toggles created by SpicyLyrics
+      pc.querySelector(".ShuffleToggle")?.remove();
+      pc.querySelector(".LoopToggle")?.remove();
+
+      // 2. Ensure PlayModeToggle exists
+      let pmBtn = pc.querySelector(".PlayModeToggle");
+      if (!pmBtn) {
+        pmBtn = document.createElement("button");
+        pmBtn.className = "PlaybackControl PlayModeToggle";
+        pmBtn.id = "PlayModeToggle";
+        pmBtn.title = "播放模式";
+        pmBtn.innerHTML = `
+          <svg class="mode-icon-order" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="7" x2="18" y2="7"/><polyline points="15 4 18 7 15 10"/><line x1="3" y1="17" x2="18" y2="17"/><polyline points="15 14 18 17 15 20"/></svg>
+          <svg class="mode-icon-shuffle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>
+          <svg class="mode-icon-loop" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        `;
+        pmBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          cyclePlayMode();
+        });
+        const prev = pc.querySelector(".PrevTrack");
+        if (prev) {
+          pc.insertBefore(pmBtn, prev);
+        } else {
+          pc.insertBefore(pmBtn, pc.firstChild);
+        }
+      }
+
+      // 3. Ensure PlayControlsSpacer exists at end for symmetry
+      let spacer = pc.querySelector(".PlayControlsSpacer");
+      if (!spacer) {
+        spacer = document.createElement("div");
+        spacer.className = "PlayControlsSpacer";
+        pc.appendChild(spacer);
+      }
+
       const isPlaying = Spicetify.Player.isPlaying();
       const playIcon = pc.querySelector(".icon-play");
       const pauseIcon = pc.querySelector(".icon-pause");
@@ -843,8 +1007,7 @@
         pauseIcon.style.display = isPlaying ? "block" : "none";
       }
       pc.querySelector(".PlayStateToggle")?.classList.toggle("Playing", isPlaying);
-      pc.querySelector(".ShuffleToggle")?.classList.toggle("Enabled", !!Spicetify.Player.getShuffle?.());
-      pc.querySelector(".LoopToggle")?.classList.toggle("Enabled", (Spicetify.Player.getRepeat?.() || 0) > 0);
+      updatePlayModeUI(pc);
     }
 
     // 1. Re-parent Timeline & PlaybackControls into NowBar Header in correct order
