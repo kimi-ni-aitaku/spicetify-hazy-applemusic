@@ -866,9 +866,11 @@
   });
 
   waitForElement([".main-view-container"], ([mainViewContainer]) => {
-    const mainViewContainerResizeObserver = new ResizeObserver(
-      updateLyricsPageProperties
-    );
+    const mainViewContainerResizeObserver = new ResizeObserver(() => {
+      if (document.body.classList.contains("is-resizing")) return;
+      if (!document.querySelector(".Root__lyrics-cinema, .lyrics-lyrics-contentWrapper")) return;
+      updateLyricsPageProperties();
+    });
     mainViewContainerResizeObserver.observe(mainViewContainer);
   });
 
@@ -939,17 +941,20 @@
 
   function setFadeDirection(scrollNode) {
     let fadeDirection = "full";
-    if (scrollNode.scrollTop === 0) {
+    if (scrollNode.scrollTop <= 0) {
       fadeDirection = "bottom";
     } else if (
-      scrollNode.scrollHeight -
-        scrollNode.scrollTop -
-        scrollNode.clientHeight ===
-      0
+      Math.abs(
+        scrollNode.scrollHeight -
+          scrollNode.scrollTop -
+          scrollNode.clientHeight
+      ) <= 2
     ) {
       fadeDirection = "top";
     }
-    scrollNode.setAttribute("fade", fadeDirection);
+    if (scrollNode.getAttribute("fade") !== fadeDirection) {
+      scrollNode.setAttribute("fade", fadeDirection);
+    }
   }
 
   // Add fade and dimness effects to mainview and the artist image on scroll
@@ -972,17 +977,16 @@
         const target = event.target;
         if (!target || target === document || target === window) return;
 
-        const isMainScroll =
-          target.closest?.(".main-view-container__scroll-node") ||
-          target.classList?.contains("main-view-container__scroll-node") ||
-          target.hasAttribute?.("data-overlayscrollbars-viewport") ||
-          (target.scrollHeight > target.clientHeight && target.closest?.(".Root__main-view"));
+        const scrollNode =
+          (target.classList?.contains("main-view-container__scroll-node") || target.hasAttribute?.("data-overlayscrollbars-viewport"))
+            ? target
+            : target.closest?.(".main-view-container__scroll-node") || target.closest?.(".Root__main-view");
 
-        if (isMainScroll) {
+        if (scrollNode) {
           if (!ticking) {
             window.requestAnimationFrame(() => {
-              applyArtistFade(target);
-              setFadeDirection(target);
+              applyArtistFade(scrollNode);
+              setFadeDirection(scrollNode);
               ticking = false;
             });
             ticking = true;
@@ -1081,4 +1085,38 @@
     reader.readAsDataURL(file);
   }; */
 
+  // Clean User Avatar Context Menu (Keep only Profile, Settings, and Log Out)
+  const menuObserver = new MutationObserver(() => {
+    const menus = document.querySelectorAll('[role="menu"]');
+    if (!menus.length) return;
+
+    const blockedKeywords = [
+      "帐号",
+      "账号",
+      "支持",
+      "最近播放",
+      "私人点歌房",
+      "Spicy Lyrics",
+      "你的更新",
+      "更新",
+      "Experimental",
+      "官方主题",
+      "主题宝库",
+      "应用商店",
+      "Marketplace",
+      "Shuffle",
+      "Home config",
+    ];
+
+    menus.forEach((menu) => {
+      Array.from(menu.children).forEach((child) => {
+        const text = child.textContent.trim();
+        if (blockedKeywords.some((kw) => text.includes(kw))) {
+          child.style.setProperty("display", "none", "important");
+        }
+      });
+    });
+  });
+
+  menuObserver.observe(document.body, { childList: true, subtree: true });
 })();

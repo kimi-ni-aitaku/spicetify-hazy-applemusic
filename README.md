@@ -55,11 +55,16 @@
 - **清除底栏多余元素**：彻底移除底栏头像后的垃圾桶按钮、右侧麦克风按钮及重复的迷你播放器图标。
 - **剔除多余滚动条**：全屏模式下彻底隐藏右侧滚动条（SimpleBar / WebKit Scrollbar），视觉边界纯净无瑕疵。
 
-### 10. ⚡ 极致性能引擎：告别窗口缩放卡顿 (Zero-Lag Resize Engine)
-- **动态拖拽拦截系统（Zero-Lag Drag Engine）**：通过全局 `body.is-resizing` 状态监听，在鼠标拖拽/缩放窗口瞬间**全面暂停所有 DOM 过渡动画与 CSS 重绘**，窗口尺寸变化零掉帧、完美跟随鼠标。
-- **消灭歌词容器过渡重排**：移除歌词容器（`.CenteredView`, `.MediaContent`, `.LyricsContent` 等）原本附带的 `transition: all`，彻底杜绝快速缩放时的重排风暴（Reflow Thrashing）。
-- **歌词文字渲染优化**：移除普通歌词行上的 GPU 模糊着色器（`filter: blur`），改用纯粹高品质透明度阶梯，大幅减轻 GPU 图层分配负担。
-- **视口缩放与滚动防抖**：采用尾随防抖（Trailing Debounce）机制，拖拽窗口期间阻断背景重算与 ArtistFade 触发，确保 60/120fps ProMotion 极致流畅。
+### 10. ⚡ 极致性能引擎：告别首页与歌词缩放拖拽卡顿 (Zero-Lag Resize Engine)
+- **动态拖拽拦截系统（Zero-Lag Drag Engine）**：通过全局 `body.is-resizing` 状态监听，在鼠标拖拽/缩放窗口瞬间**全面暂停所有 DOM 过渡动画、CSS 重绘、重度毛玻璃（backdrop-filter）与阴影**，窗口尺寸变化零掉帧、丝滑跟随鼠标。
+- **首页货架布局隔离（Layout Containment）**：为首页所有推荐卡片栏与货架（`[data-testid="component-shelf"]`, `.main-shelf-shelf`）开启 CSS `contain: layout style`，彻底杜绝单行卡片宽度变动引发的全页面级重排风暴（Reflow Thrashing）。
+- **消除双重重叠毛玻璃**：取消主视口内部容器（`.main-view-container`）的多余毛玻璃与阴影图层，仅保留最外层单层高质感磨砂，大幅释放 GPU 显存带宽与 Fill Rate。
+- **剔除同步滚动重流（Layout Thrashing）**：重构 `galaxyFade` 滚动监听器与 `ResizeObserver`，消除窗口尺寸变化时在非歌词页面对 `scrollHeight` / `calculateLyricsMaxWidth` 的强制同步读取，保持 60/120fps ProMotion 极致流畅。
+
+### 11. 🛡️ 纯净极简体验：彻底清除插件冗余与广告外链
+- **秒开原生首页**：彻底剔除容易导致主界面中央空白的 `home_config` 外部接管逻辑，无感恢复 Spotify 官方原生高速卡片流与个性化推荐。
+- **剥离一切臃肿组件**：移除非必要的官方主题库（Marketplace）、Shuffle+、Spicetify 更新弹窗及实验性特性开关，降到仅保留核心去广告与 Apple Music 歌词扩展。
+- **头像菜单极致净化**：点击右上角用户头像时，彻底隐藏「帐号外链」、「支持」、「最近播放」、「私人点歌房」、「你的更新」及插件注入项，**仅保留纯净三项：个人资料、设置、退出**。
 
 ---
 

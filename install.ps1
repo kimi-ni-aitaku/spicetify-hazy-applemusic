@@ -47,6 +47,10 @@ Write-Host "⚙️ 正在应用主题与扩展配置..." -ForegroundColor Cyan
 spicetify config current_theme Hazy
 spicetify config color_scheme ""
 spicetify config extensions spicy-lyrics.mjs
+spicetify config custom_apps ""
+spicetify config home_config 0
+spicetify config experimental_features 0
+spicetify config check_spicetify_update 0
 
 # 5. Apply
 Write-Host "🚀 正在生效主题至 Spotify..." -ForegroundColor Cyan
