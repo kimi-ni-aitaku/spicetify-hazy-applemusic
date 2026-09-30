@@ -1,3 +1,15 @@
+/* =========================================================================
+   Zero-Lag Window Drag & Resize Engine
+   Completely suspends all transitions and animations while window is resizing
+   ========================================================================= */
+body.is-resizing,
+body.is-resizing *,
+body.is-resizing *::before,
+body.is-resizing *::after {
+  transition: none !important;
+  animation-duration: 0.001ms !important;
+}
+
 :root {
   --backdrop-light: rgb(68 68 68 / 30%);
   --backdrop-lighter: rgba(0, 0, 0, 0.3);
@@ -3694,39 +3706,54 @@ button[data-testid="trashbin-button"],
   transform: scale(1.22) !important;
 }
 
-/* 6. Apple Music Typography & Progressive Depth for Lyrics */
+/* 6. Apple Music Typography & Progressive Depth for Lyrics (Zero-Lag Optimized) */
 #SpicyLyricsPage .line {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
   letter-spacing: -0.015em !important;
-  transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), filter 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+  transition: opacity 0.35s ease, color 0.35s ease, text-shadow 0.35s ease !important;
+  will-change: auto !important;
 }
 
 /* Active Highlight Line */
 #SpicyLyricsPage .line.Active {
   opacity: 1 !important;
   filter: none !important;
-  transform: scale(1.02) !important;
-  transform-origin: left center !important;
   text-shadow: 0 0 24px rgba(255, 255, 255, 0.28), 0 2px 10px rgba(0, 0, 0, 0.35) !important;
 }
 
-/* Inactive Sung Lines */
+/* Inactive Sung Lines (Pure crisp opacity hierarchy, no GPU-thrashing blur) */
 #SpicyLyricsPage .line.Sung {
   opacity: 0.32 !important;
-  filter: blur(0.5px) !important;
+  filter: none !important;
 }
 
 /* Inactive NotSung Lines */
 #SpicyLyricsPage .line.NotSung {
-  opacity: 0.42 !important;
-  filter: blur(0.4px) !important;
+  opacity: 0.44 !important;
+  filter: none !important;
 }
 
 /* Interactive hover on any line */
 #SpicyLyricsPage .line:not(.Active):hover {
-  opacity: 0.82 !important;
-  filter: blur(0px) !important;
+  opacity: 0.85 !important;
+  filter: none !important;
   cursor: pointer !important;
+}
+
+/* Eliminate Layout Transition Thrashing in SpicyLyrics Containers */
+#SpicyLyricsPage,
+#SpicyLyricsPage .CenteredView,
+#SpicyLyricsPage .Header,
+#SpicyLyricsPage .MediaBox,
+#SpicyLyricsPage .MediaContent,
+#SpicyLyricsPage .MediaImageContainer,
+#SpicyLyricsPage .LyricsContent,
+#SpicyLyricsPage .SpicyLyricsScrollContainer,
+#SpicyLyricsPage .ContentBox,
+#SpicyLyricsPage .NowBar,
+#SpicyLyricsPage .ib_ImageBox,
+#SpicyLyricsPage .word {
+  transition-property: opacity, color, text-shadow !important;
 }
 
 /* Hide promotional/author links in Settings Modal */
