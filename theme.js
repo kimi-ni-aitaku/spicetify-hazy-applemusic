@@ -703,43 +703,154 @@
     }
   }, 500);
 
+  let isSeeking = false;
+  let seekTargetProgress = 0;
+  let seekLockTimer = null;
+
+  function setupTimelineScrubber(page) {
+    if (!page) return;
+    const slider = page.querySelector(".Timeline .SliderBar");
+    if (!slider || slider.__scrubberAttached) return;
+    slider.__scrubberAttached = true;
+
+    function getProgressFromEvent(e) {
+      const rect = slider.getBoundingClientRect();
+      if (!rect.width) return 0;
+      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    }
+
+    function updateUI(progress) {
+      slider.style.setProperty("--SliderProgress", progress);
+      const duration = Spicetify?.Player?.getDuration?.() || 0;
+      if (duration > 0) {
+        const curTimeEl = page.querySelector('.Timeline .Time[data-position="Current"]');
+        if (curTimeEl) {
+          const curMs = Math.round(progress * duration);
+          const m = Math.floor(curMs / 60000);
+          const s = Math.floor((curMs % 60000) / 1000);
+          curTimeEl.textContent = `${m}:${s < 10 ? "0" : ""}${s}`;
+        }
+      }
+    }
+
+    function onPointerDown(e) {
+      if (e.button !== 0 && e.type !== "touchstart") return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      isSeeking = true;
+      slider.classList.add("is-scrubbing", "Dragging");
+      seekTargetProgress = getProgressFromEvent(e);
+      updateUI(seekTargetProgress);
+
+      function onPointerMove(moveEvent) {
+        if (!isSeeking) return;
+        moveEvent.preventDefault();
+        seekTargetProgress = getProgressFromEvent(moveEvent);
+        updateUI(seekTargetProgress);
+      }
+
+      function onPointerUp(upEvent) {
+        window.removeEventListener("pointermove", onPointerMove);
+        window.removeEventListener("pointerup", onPointerUp);
+        window.removeEventListener("mousemove", onPointerMove);
+        window.removeEventListener("mouseup", onPointerUp);
+        window.removeEventListener("touchmove", onPointerMove);
+        window.removeEventListener("touchend", onPointerUp);
+
+        if (!isSeeking) return;
+        seekTargetProgress = getProgressFromEvent(upEvent);
+        updateUI(seekTargetProgress);
+
+        const duration = Spicetify?.Player?.getDuration?.() || 0;
+        if (duration > 0) {
+          const targetMs = Math.round(seekTargetProgress * duration);
+          Spicetify.Player.seek(targetMs);
+        }
+
+        slider.classList.remove("Dragging");
+
+        clearTimeout(seekLockTimer);
+        seekLockTimer = setTimeout(() => {
+          isSeeking = false;
+          slider.classList.remove("is-scrubbing");
+        }, 380);
+      }
+
+      window.addEventListener("pointermove", onPointerMove, { passive: false });
+      window.addEventListener("pointerup", onPointerUp);
+      window.addEventListener("mousemove", onPointerMove, { passive: false });
+      window.addEventListener("mouseup", onPointerUp);
+      window.addEventListener("touchmove", onPointerMove, { passive: false });
+      window.addEventListener("touchend", onPointerUp);
+    }
+
+    slider.addEventListener("pointerdown", onPointerDown);
+    slider.addEventListener("mousedown", onPointerDown);
+
+    // Guard against background ticker overwriting progress during seek / lock window
+    const origSetProperty = slider.style.setProperty;
+    slider.style.setProperty = function (prop, val, pri) {
+      if (prop === "--SliderProgress" && isSeeking) {
+        return;
+      }
+      return origSetProperty.call(this, prop, val, pri);
+    };
+  }
+
   let syncScheduled = false;
   function syncSpicyControls() {
     const page = document.getElementById("SpicyLyricsPage");
     if (!page) return;
 
-    // 1. Re-parent PlaybackControls from MediaContent into NowBar Header
+    // Prevent SpicyLyrics CompactMode from breaking desktop fullscreen layout
+    if (page.classList.contains("Fullscreen")) {
+      if (page.classList.contains("CompactMode") || page.classList.contains("CompactifyEnabledCompactMode") || page.classList.contains("ForcedCompactMode")) {
+        page.classList.remove("CompactMode", "CompactifyEnabledCompactMode", "ForcedCompactMode");
+      }
+    }
+
     const header = page.querySelector(".NowBar .Header");
-    const pc = page.querySelector(".PlaybackControls");
+    const tl = page.querySelector(".Timeline");
+    let pc = page.querySelector(".PlaybackControls");
+
+    // Eagerly trigger PlaybackControls creation if SpicyLyrics hasn't spawned it yet
+    if (!pc) {
+      const mb = page.querySelector(".MediaBox");
+      if (mb) {
+        mb.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+        mb.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+        pc = page.querySelector(".PlaybackControls");
+      }
+    }
+
+    // 1. Re-parent Timeline & PlaybackControls into NowBar Header in correct order
+    if (header && tl && tl.parentElement !== header) {
+      if (pc && pc.parentElement === header) {
+        header.insertBefore(tl, pc);
+      } else {
+        header.appendChild(tl);
+      }
+    }
     if (header && pc && pc.parentElement !== header) {
       header.appendChild(pc);
     }
 
+    // Initialize silky smooth timeline scrubber
+    setupTimelineScrubber(page);
+
+    // Suppress tooltips on PlaybackControls
     if (pc) {
-      const isPlaying = Spicetify.Player.isPlaying();
-      const pcTooltips = {
-        ShuffleToggle: "随机播放",
-        PrevTrack: "上一首",
-        PlayStateToggle: isPlaying ? "暂停" : "播放",
-        NextTrack: "下一首",
-        LoopToggle: "循环播放"
-      };
-      for (const [cls, tip] of Object.entries(pcTooltips)) {
-        const btn = pc.querySelector(`.${cls}`);
-        if (btn && btn.title !== tip) {
-          btn.title = tip;
-          btn.setAttribute("data-tooltip", tip);
-        }
-      }
+      pc.querySelectorAll("button, .PlaybackControl").forEach((b) => {
+        b.removeAttribute("title");
+        b.removeAttribute("data-tooltip");
+      });
     }
 
     // 2. ViewControls top-right capsule & button filtering
     const vc = page.querySelector(".ViewControls");
     if (!vc) return;
-
-    const nowBar = page.querySelector(".NowBar");
-    const isNowBarOpen = nowBar && nowBar.classList.contains("Active") && !page.classList.contains("NowBarStatus__Closed");
-    const isCompact = page.classList.contains("CompactMode") || page.classList.contains("ForcedCompactMode");
 
     // Inject or update NowBarToggle button
     let nbToggle = vc.querySelector("#NowBarToggle");
@@ -747,8 +858,6 @@
       nbToggle = document.createElement("button");
       nbToggle.id = "NowBarToggle";
       nbToggle.className = "ViewControl";
-      nbToggle.setAttribute("data-tooltip", "无图模式 / 切换封面");
-      nbToggle.title = "无图模式 / 切换封面";
       nbToggle.innerHTML = `<svg class="NoFill" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2.5"/><rect x="6" y="7.5" width="6" height="6" rx="1"/><path d="M14.5 9h3.5"/><path d="M14.5 12h3.5"/><path d="M6.5 17h11"/></svg>`;
       nbToggle.addEventListener("click", (e) => {
         e.preventDefault();
@@ -768,37 +877,43 @@
       }
     }
 
-    // Control bar placement: always keep floating at top right (Never overlay on album art)
+    // Control bar placement: always keep floating at top right
     const contentBox = page.querySelector(".ContentBox") || page;
     if (contentBox && vc.parentElement !== contentBox) {
       contentBox.appendChild(vc);
     }
 
-    // Cancel Settings button (Keep interface ultra-clean)
+    // Cancel Settings and Compact Mode toggles (Keep interface ultra-clean)
     const settingsBtn = vc.querySelector("#SettingsToggle");
     if (settingsBtn) {
       settingsBtn.style.setProperty("display", "none", "important");
     }
+    const compactBtn = vc.querySelector("#CompactModeToggle");
+    if (compactBtn) {
+      compactBtn.style.setProperty("display", "none", "important");
+    }
 
-    // Natural Chinese Tooltips
-    const tooltips = {
-      CompactModeToggle: isCompact ? "退出紧凑封面" : "紧凑封面模式",
-      NowBarToggle: isNowBarOpen ? "无图模式 (全屏歌词)" : "显示专辑封面",
-      NowBarSideToggle: "切换封面左右侧",
-      RomanizationToggle: "日语假名 / 罗马音注音",
-      SettingsToggle: "歌词设置",
-      Close: "退出全屏歌词"
-    };
-    for (const [id, tip] of Object.entries(tooltips)) {
-      const btn = vc.querySelector(`#${id}`);
-      if (btn) {
-        btn.title = tip;
-        btn.setAttribute("data-tooltip", tip);
-        if (btn._tippy && typeof btn._tippy.setContent === "function") {
-          btn._tippy.setContent(tip);
-        }
+    // Replace Japanese "な" icon with Apple-style bilingual translation / phonetics icon
+    const romBtn = vc.querySelector("#RomanizationToggle");
+    if (romBtn) {
+      const appleTransSvg = `<svg class="NoFill" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>`;
+      if (romBtn.innerHTML !== appleTransSvg) {
+        romBtn.innerHTML = appleTransSvg;
       }
     }
+
+    // Completely remove all tooltip attributes and tippy instances from capsule buttons
+    vc.querySelectorAll("button, .ViewControl").forEach((btn) => {
+      btn.removeAttribute("title");
+      btn.removeAttribute("data-tooltip");
+      if (btn._tippy) {
+        try {
+          btn._tippy.destroy();
+        } catch (e) {
+          btn._tippy.disable();
+        }
+      }
+    });
   }
 
   // Observer for SpicyLyrics elements & Settings Modal translations
