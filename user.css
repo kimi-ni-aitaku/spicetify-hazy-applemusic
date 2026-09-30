@@ -3806,8 +3806,7 @@ button[data-testid="trashbin-button"],
 /* 8. Memory & Performance: Kill background canvas outside of fullscreen */
 .NowPlayingView .spicy-dynamic-bg,
 .NowPlayingView.spicy-dynamic-bg-in-this,
-#SpicyLyricsNPVCard,
-#SpicyLyricsPage:not(.Fullscreen) {
+#SpicyLyricsNPVCard {
   display: none !important;
 }
 

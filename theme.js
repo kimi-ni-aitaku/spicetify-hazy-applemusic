@@ -288,7 +288,7 @@
   if (Spicetify.Platform?.History?.listen) {
     Spicetify.Platform.History.listen((loc) => {
       const p = loc?.pathname || Spicetify.Platform?.History?.location?.pathname;
-      if (p && p !== "/lyrics") {
+      if (p && p !== "/lyrics" && p !== "/SpicyLyrics") {
         lastNonLyricsRoute = p;
       }
     });
@@ -314,6 +314,11 @@
       const close = document.getElementById("Close");
       if (close) {
         close.click();
+        setTimeout(() => {
+          if (Spicetify.Platform?.History?.push) {
+            Spicetify.Platform.History.push(lastNonLyricsRoute || "/");
+          }
+        }, 50);
         return;
       }
     }
@@ -322,6 +327,21 @@
       fsBtn.click();
     }
   }
+
+  // Handle direct click on [ ✕ ] close button in lyrics capsule
+  document.addEventListener(
+    "click",
+    (event) => {
+      if (event.target.closest("#Close")) {
+        setTimeout(() => {
+          if (Spicetify.Platform?.History?.push) {
+            Spicetify.Platform.History.push(lastNonLyricsRoute || "/");
+          }
+        }, 50);
+      }
+    },
+    true
+  );
 
   // Click bottom-left cover art to toggle Apple Music Fullscreen Lyrics
   document.addEventListener(
