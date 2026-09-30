@@ -3455,41 +3455,75 @@ button[data-testid="trashbin-button"],
   filter: none !important;
 }
 
-/* 2. Fullscreen Controls: Embed in Album Artwork & Support No-Picture Mode */
+/* 2. Clean Scrollbars: Completely eliminate all scrollbar tracks & thumbs in Fullscreen Lyrics */
+#SpicyLyricsPage ::-webkit-scrollbar,
+#SpicyLyricsPage .os-scrollbar,
+#SpicyLyricsPage .simplebar-track,
+#SpicyLyricsPage .simplebar-scrollbar,
+#SpicyLyricsPage [data-overlayscrollbars-viewport]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+#SpicyLyricsPage,
+#SpicyLyricsPage * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* 3. Inactivity Auto-Fade: Pure Apple Music Immersion */
+#SpicyLyricsPage.is-inactive {
+  cursor: none !important;
+}
+
+#SpicyLyricsPage.is-inactive .ViewControls,
+#SpicyLyricsPage.is-inactive .NowBar .PlaybackControls,
+#SpicyLyricsPage.is-inactive .NowBar .Timeline,
+#SpicyLyricsPage.is-inactive .NowBar .ProgressBox,
+#SpicyLyricsPage.is-inactive .NowBar .VolumeControl {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* 4. Unified Apple-Style Frosted Capsule Bar for ViewControls */
 #SpicyLyricsPage .ViewControls {
   container-type: normal !important;
-  display: flex !important;
-  gap: 10px !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 8px !important;
+  border-radius: 9999px !important;
+  background: rgba(18, 18, 24, 0.62) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.15) !important;
   z-index: 100 !important;
   pointer-events: auto !important;
-  transition: opacity 0.25s ease !important;
+  transition: opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1), transform 0.3s cubic-bezier(0.25, 1, 0.5, 1) !important;
 }
 
 /* Embedded directly on Album Artwork (Default Picture Mode) */
 #SpicyLyricsPage:not(.CompactMode):not(.ForcedCompactMode) .NowBar.Active .MediaContent .ViewControls {
   position: absolute !important;
   top: 14px !important;
-  left: 0 !important;
-  right: 0 !important;
+  left: 50% !important;
+  right: auto !important;
   bottom: auto !important;
-  width: 100% !important;
-  height: 38px !important;
-  justify-content: center !important;
-  align-items: center !important;
-  opacity: 0.9 !important;
+  transform: translateX(-50%) !important;
+  width: auto !important;
+  height: auto !important;
+  opacity: 0.88 !important;
 }
 
 #SpicyLyricsPage:not(.CompactMode):not(.ForcedCompactMode) .NowBar.Active .MediaContent .ViewControls:hover {
   opacity: 1 !important;
-}
-
-/* Album artwork controls subtle visibility with hover brighten */
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .MediaContent {
-  opacity: max(0.45, var(--ControlsOpacity)) !important;
-  transition: opacity 0.3s ease !important;
-}
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox:hover .MediaContent {
-  opacity: 1 !important;
+  transform: translateX(-50%) scale(1.02) !important;
 }
 
 /* Floating at Top Right in No-Picture Mode or Compact Mode */
@@ -3502,11 +3536,10 @@ button[data-testid="trashbin-button"],
   right: 32px !important;
   left: auto !important;
   bottom: auto !important;
+  transform: none !important;
   width: auto !important;
-  height: 38px !important;
-  justify-content: flex-end !important;
-  align-items: center !important;
-  opacity: 0.55 !important;
+  height: auto !important;
+  opacity: 0.65 !important;
   z-index: 1000 !important;
 }
 
@@ -3515,50 +3548,53 @@ button[data-testid="trashbin-button"],
 #SpicyLyricsPage.CompactMode .ViewControls:hover,
 #SpicyLyricsPage.ForcedCompactMode .ViewControls:hover {
   opacity: 1 !important;
+  transform: scale(1.02) !important;
 }
 
-/* Frosted Glass Circular Buttons matching Apple Music */
+/* Seamless Buttons inside the Capsule */
 #SpicyLyricsPage .ViewControls .ViewControl,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .ViewControls .ViewControl,
 #SpicyLyricsPage .ContentBox .NowBar .Header .MediaBox .MediaContent .ViewControls .ViewControl {
-  --ViewControlSize: 36px !important;
-  width: 36px !important;
-  height: 36px !important;
-  min-width: 36px !important;
-  min-height: 36px !important;
+  --ViewControlSize: 32px !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
   aspect-ratio: 1 / 1 !important;
   border-radius: 50% !important;
-  background: rgba(20, 20, 25, 0.55) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.25) !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45) !important;
-  color: #ffffff !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: rgba(255, 255, 255, 0.82) !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
   cursor: pointer !important;
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, border-color 0.2s ease !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+  padding: 0 !important;
 }
 
 #SpicyLyricsPage .ViewControls .ViewControl:hover,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .ViewControls .ViewControl:hover {
-  background: rgba(255, 255, 255, 0.28) !important;
-  border-color: rgba(255, 255, 255, 0.5) !important;
-  transform: scale(1.08) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+  transform: scale(1.12) !important;
 }
 
 #SpicyLyricsPage .ViewControls .ViewControl:active,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .ViewControls .ViewControl:active {
   transform: scale(0.92) !important;
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 #SpicyLyricsPage .ViewControls .ViewControl svg,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .CenteredView .Header .MediaBox .MediaContent .ViewControls .ViewControl svg {
-  width: 18px !important;
-  height: 18px !important;
-  max-width: 18px !important;
-  max-height: 18px !important;
+  width: 17px !important;
+  height: 17px !important;
+  max-width: 17px !important;
+  max-height: 17px !important;
   color: #ffffff !important;
   stroke: #ffffff !important;
 }
@@ -3583,13 +3619,130 @@ button[data-testid="trashbin-button"],
   display: none !important;
 }
 
+/* 5. Apple Music Album Artwork: Ambient Glow & Clean Borders */
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1) !important;
+  transition: transform 0.35s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.35s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox img {
+  border-radius: 14px !important;
+}
+
+/* Playback Controls on Cover: Compact Hover Dock matching Apple Music */
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .PlaybackControls {
+  container-type: normal !important;
+  position: absolute !important;
+  bottom: 18px !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) translateY(8px) !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: auto !important;
+  max-width: fit-content !important;
+  min-width: fit-content !important;
+  gap: 12px !important;
+  padding: 6px 18px !important;
+  border-radius: 9999px !important;
+  background: rgba(18, 18, 24, 0.65) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.35s cubic-bezier(0.25, 1, 0.5, 1), transform 0.35s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Hover over MediaBox reveals the playback dock */
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox:hover .PlaybackControls {
+  opacity: 0.95 !important;
+  transform: translateX(-50%) translateY(0) !important;
+  pointer-events: auto !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .PlaybackControls:hover {
+  opacity: 1 !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .PlaybackControls .PlaybackControl {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s ease !important;
+  padding: 0 !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .PlaybackControls .PlaybackControl:hover {
+  transform: scale(1.15) !important;
+  color: #ffffff !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .PlaybackControls .PlayStateToggle {
+  transform: scale(1.1) !important;
+}
+
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .MediaBox .PlaybackControls .PlayStateToggle:hover {
+  transform: scale(1.22) !important;
+}
+
+/* 6. Apple Music Typography & Progressive Depth for Lyrics */
+#SpicyLyricsPage .line {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "SF Pro Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif !important;
+  letter-spacing: -0.015em !important;
+  transition: opacity 0.4s cubic-bezier(0.25, 1, 0.5, 1), filter 0.4s cubic-bezier(0.25, 1, 0.5, 1), transform 0.4s cubic-bezier(0.25, 1, 0.5, 1) !important;
+}
+
+/* Active Highlight Line */
+#SpicyLyricsPage .line.Active {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: scale(1.02) !important;
+  transform-origin: left center !important;
+  text-shadow: 0 0 24px rgba(255, 255, 255, 0.28), 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+}
+
+/* Inactive Sung Lines */
+#SpicyLyricsPage .line.Sung {
+  opacity: 0.32 !important;
+  filter: blur(0.5px) !important;
+}
+
+/* Inactive NotSung Lines */
+#SpicyLyricsPage .line.NotSung {
+  opacity: 0.42 !important;
+  filter: blur(0.4px) !important;
+}
+
+/* Interactive hover on any line */
+#SpicyLyricsPage .line:not(.Active):hover {
+  opacity: 0.82 !important;
+  filter: blur(0px) !important;
+  cursor: pointer !important;
+}
+
 /* Hide promotional/author links in Settings Modal */
 .sl-sp-footer-link,
 .sl-sp-footer {
   display: none !important;
 }
 
-/* 4. Apple Music Typography for NowBar Track Info */
+/* 7. Apple Music Typography for NowBar Track Info */
 #SpicyLyricsPage .NowBar .Metadata .SongName {
   font-size: 1.85rem !important;
   font-weight: 700 !important;
@@ -3604,7 +3757,7 @@ button[data-testid="trashbin-button"],
   color: #ffffff !important;
 }
 
-/* 5. Memory & Performance: Kill background canvas outside of fullscreen */
+/* 8. Memory & Performance: Kill background canvas outside of fullscreen */
 .NowPlayingView .spicy-dynamic-bg,
 .NowPlayingView.spicy-dynamic-bg-in-this,
 #SpicyLyricsNPVCard,
@@ -3612,7 +3765,7 @@ button[data-testid="trashbin-button"],
   display: none !important;
 }
 
-/* 6. Clean Chinese Buttons in Settings Modal */
+/* 9. Clean Chinese Buttons in Settings Modal */
 #home-save,
 #value-reset {
   min-width: 96px !important;
@@ -3620,4 +3773,3 @@ button[data-testid="trashbin-button"],
   padding: 0 16px !important;
   letter-spacing: normal !important;
 }
-

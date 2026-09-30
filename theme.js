@@ -364,6 +364,36 @@
     }
   });
 
+  // Apple Music Inactivity Auto-Fade (3.5s idle fades out controls & cursor)
+  let inactivityTimer = null;
+  function handleUserActivity() {
+    const page = document.getElementById("SpicyLyricsPage");
+    if (!page || !page.classList.contains("Fullscreen")) return;
+
+    if (page.classList.contains("is-inactive")) {
+      page.classList.remove("is-inactive");
+    }
+    clearTimeout(inactivityTimer);
+
+    inactivityTimer = setTimeout(() => {
+      const activePage = document.getElementById("SpicyLyricsPage");
+      if (
+        activePage &&
+        activePage.classList.contains("Fullscreen") &&
+        !document.querySelector("sl-generic-modal, .main-contextMenu-menu")
+      ) {
+        activePage.classList.add("is-inactive");
+      }
+    }, 3500);
+  }
+
+  window.addEventListener("mousemove", handleUserActivity, { passive: true });
+  window.addEventListener("mousedown", handleUserActivity, { passive: true });
+  window.addEventListener("keydown", handleUserActivity, { passive: true });
+  window.addEventListener("wheel", handleUserActivity, { passive: true });
+  window.addEventListener("touchstart", handleUserActivity, { passive: true });
+  setTimeout(handleUserActivity, 1500);
+
   // =========================================================================
   // SpicyLyrics Enhancements: Artwork Embedded Controls, No-Picture Mode, & Chinese Settings
   // =========================================================================
