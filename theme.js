@@ -707,6 +707,33 @@
   function syncSpicyControls() {
     const page = document.getElementById("SpicyLyricsPage");
     if (!page) return;
+
+    // 1. Re-parent PlaybackControls from MediaContent into NowBar Header
+    const header = page.querySelector(".NowBar .Header");
+    const pc = page.querySelector(".PlaybackControls");
+    if (header && pc && pc.parentElement !== header) {
+      header.appendChild(pc);
+    }
+
+    if (pc) {
+      const isPlaying = Spicetify.Player.isPlaying();
+      const pcTooltips = {
+        ShuffleToggle: "随机播放",
+        PrevTrack: "上一首",
+        PlayStateToggle: isPlaying ? "暂停" : "播放",
+        NextTrack: "下一首",
+        LoopToggle: "循环播放"
+      };
+      for (const [cls, tip] of Object.entries(pcTooltips)) {
+        const btn = pc.querySelector(`.${cls}`);
+        if (btn && btn.title !== tip) {
+          btn.title = tip;
+          btn.setAttribute("data-tooltip", tip);
+        }
+      }
+    }
+
+    // 2. ViewControls top-right capsule & button filtering
     const vc = page.querySelector(".ViewControls");
     if (!vc) return;
 
@@ -714,7 +741,7 @@
     const isNowBarOpen = nowBar && nowBar.classList.contains("Active") && !page.classList.contains("NowBarStatus__Closed");
     const isCompact = page.classList.contains("CompactMode") || page.classList.contains("ForcedCompactMode");
 
-    // 1. Inject or update NowBarToggle button
+    // Inject or update NowBarToggle button
     let nbToggle = vc.querySelector("#NowBarToggle");
     if (!nbToggle) {
       nbToggle = document.createElement("button");
@@ -741,7 +768,7 @@
       }
     }
 
-    // 2. Control bar placement: always keep floating at top right (Never overlay on album art)
+    // Control bar placement: always keep floating at top right (Never overlay on album art)
     const contentBox = page.querySelector(".ContentBox") || page;
     if (contentBox && vc.parentElement !== contentBox) {
       contentBox.appendChild(vc);
@@ -753,7 +780,7 @@
       settingsBtn.style.setProperty("display", "none", "important");
     }
 
-    // 3. Natural Chinese Tooltips
+    // Natural Chinese Tooltips
     const tooltips = {
       CompactModeToggle: isCompact ? "退出紧凑封面" : "紧凑封面模式",
       NowBarToggle: isNowBarOpen ? "无图模式 (全屏歌词)" : "显示专辑封面",
@@ -779,13 +806,29 @@
     let relevant = false;
     for (let i = 0; i < mutations.length; i++) {
       const m = mutations[i];
-      if (m.target && (m.target.id === "SpicyLyricsPage" || m.target.classList?.contains("ViewControls") || m.target.tagName === "SL-GENERIC-MODAL")) {
+      if (m.target && (
+        m.target.id === "SpicyLyricsPage" ||
+        m.target.classList?.contains("ViewControls") ||
+        m.target.classList?.contains("MediaContent") ||
+        m.target.classList?.contains("MediaBox") ||
+        m.target.classList?.contains("NowBar") ||
+        m.target.classList?.contains("Header") ||
+        m.target.classList?.contains("PlaybackControls") ||
+        m.target.tagName === "SL-GENERIC-MODAL"
+      )) {
         relevant = true;
         break;
       }
       for (let j = 0; j < m.addedNodes.length; j++) {
         const node = m.addedNodes[j];
-        if (node.nodeType === 1 && (node.id === "SpicyLyricsPage" || node.tagName === "SL-GENERIC-MODAL" || node.classList?.contains("SpicyLyricsModal"))) {
+        if (node.nodeType === 1 && (
+          node.id === "SpicyLyricsPage" ||
+          node.tagName === "SL-GENERIC-MODAL" ||
+          node.classList?.contains("SpicyLyricsModal") ||
+          node.classList?.contains("PlaybackControls") ||
+          node.classList?.contains("MediaBox") ||
+          node.classList?.contains("NowBar")
+        )) {
           relevant = true;
           break;
         }
