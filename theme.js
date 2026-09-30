@@ -267,6 +267,42 @@
     return rgb.r > threshold && rgb.g > threshold && rgb.b > threshold;
   }
 
+  // Optimistic Seek Wrapper: Prevents Spotify async seek position snapback / jitter
+  function installOptimisticSeekWrapper() {
+    if (!Spicetify?.Player?.seek || !Spicetify?.Player?.getProgress) return;
+    if (Spicetify.Player.__optimisticSeekInstalled) return;
+    Spicetify.Player.__optimisticSeekInstalled = true;
+
+    let optimisticProgress = null;
+    let optimisticUntil = 0;
+
+    const origSeek = Spicetify.Player.seek;
+    Spicetify.Player.seek = function (count) {
+      const duration = Spicetify.Player.getDuration() || 0;
+      const targetMs = count <= 1 && duration > 0 ? Math.round(count * duration) : Math.round(count);
+      optimisticProgress = targetMs;
+      optimisticUntil = Date.now() + 1500;
+      return origSeek.call(this, count);
+    };
+
+    const origGetProgress = Spicetify.Player.getProgress;
+    Spicetify.Player.getProgress = function () {
+      if (optimisticProgress !== null) {
+        if (Date.now() < optimisticUntil) {
+          const real = origGetProgress.call(this);
+          if (Math.abs(real - optimisticProgress) < 1000) {
+            optimisticProgress = null;
+            return real;
+          }
+          return optimisticProgress;
+        }
+        optimisticProgress = null;
+      }
+      return origGetProgress.call(this);
+    };
+  }
+
+  installOptimisticSeekWrapper();
   loadSliders();
   loadToggles();
   Spicetify.Player.addEventListener("songchange", onSongChange);
@@ -604,14 +640,39 @@
       });
 
       const track = bar.querySelector(".PureLyricsTrack");
-      track.addEventListener("click", (e) => {
-        e.stopPropagation();
+      function handleBottomSeek(e) {
         const rect = track.getBoundingClientRect();
-        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        const dur = Spicetify.Player.getDuration();
-        if (dur > 0) {
-          Spicetify.Player.seek(pct);
+        if (!rect.width) return 0;
+        const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+        const dur = Spicetify.Player.getDuration() || 0;
+        const targetMs = Math.round(pct * dur);
+        const prog = bar.querySelector(".PureLyricsProgress");
+        if (prog) prog.style.width = `${pct * 100}%`;
+        const curTime = bar.querySelector(".time-cur");
+        if (curTime) curTime.textContent = Spicetify.Player.formatTime(targetMs);
+        return targetMs;
+      }
+      track.addEventListener("pointerdown", (e) => {
+        e.stopPropagation();
+        bar.__isBottomDragging = true;
+        handleBottomSeek(e);
+        function onPointerMove(me) {
+          if (!bar.__isBottomDragging) return;
+          handleBottomSeek(me);
         }
+        function onPointerUp(ue) {
+          if (!bar.__isBottomDragging) return;
+          bar.__isBottomDragging = false;
+          window.removeEventListener("pointermove", onPointerMove);
+          window.removeEventListener("pointerup", onPointerUp);
+          const finalMs = handleBottomSeek(ue);
+          if (finalMs !== undefined) {
+            Spicetify.Player.seek(finalMs);
+          }
+        }
+        window.addEventListener("pointermove", onPointerMove);
+        window.addEventListener("pointerup", onPointerUp);
       });
 
       page.appendChild(bar);
@@ -650,17 +711,19 @@
       pauseIcon.style.display = isPlaying ? "block" : "none";
     }
 
-    const curMs = Spicetify.Player.getProgress() || 0;
-    const durMs = Spicetify.Player.getDuration() || 1;
-    const pct = Math.min(100, Math.max(0, (curMs / durMs) * 100));
+    if (!bar.__isBottomDragging) {
+      const curMs = Spicetify.Player.getProgress() || 0;
+      const durMs = Spicetify.Player.getDuration() || 1;
+      const pct = Math.min(100, Math.max(0, (curMs / durMs) * 100));
 
-    const prog = bar.querySelector(".PureLyricsProgress");
-    if (prog) prog.style.width = `${pct}%`;
+      const prog = bar.querySelector(".PureLyricsProgress");
+      if (prog) prog.style.width = `${pct}%`;
 
-    const curTime = bar.querySelector(".time-cur");
-    const durTime = bar.querySelector(".time-dur");
-    if (curTime) curTime.textContent = Spicetify.Player.formatTime(curMs);
-    if (durTime) durTime.textContent = Spicetify.Player.formatTime(durMs);
+      const curTime = bar.querySelector(".time-cur");
+      const durTime = bar.querySelector(".time-dur");
+      if (curTime) curTime.textContent = Spicetify.Player.formatTime(curMs);
+      if (durTime) durTime.textContent = Spicetify.Player.formatTime(durMs);
+    }
   }
 
   function toggleNowBarPictureMode() {
@@ -703,106 +766,12 @@
     }
   }, 500);
 
-  let isSeeking = false;
-  let seekTargetProgress = 0;
-  let seekLockTimer = null;
-
-  function setupTimelineScrubber(page) {
-    if (!page) return;
-    const slider = page.querySelector(".Timeline .SliderBar");
-    if (!slider || slider.__scrubberAttached) return;
-    slider.__scrubberAttached = true;
-
-    function getProgressFromEvent(e) {
-      const rect = slider.getBoundingClientRect();
-      if (!rect.width) return 0;
-      const clientX = e.clientX ?? (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-      return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    }
-
-    function updateUI(progress) {
-      slider.style.setProperty("--SliderProgress", progress);
-      const duration = Spicetify?.Player?.getDuration?.() || 0;
-      if (duration > 0) {
-        const curTimeEl = page.querySelector('.Timeline .Time[data-position="Current"]');
-        if (curTimeEl) {
-          const curMs = Math.round(progress * duration);
-          const m = Math.floor(curMs / 60000);
-          const s = Math.floor((curMs % 60000) / 1000);
-          curTimeEl.textContent = `${m}:${s < 10 ? "0" : ""}${s}`;
-        }
-      }
-    }
-
-    function onPointerDown(e) {
-      if (e.button !== 0 && e.type !== "touchstart") return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      isSeeking = true;
-      slider.classList.add("is-scrubbing", "Dragging");
-      seekTargetProgress = getProgressFromEvent(e);
-      updateUI(seekTargetProgress);
-
-      function onPointerMove(moveEvent) {
-        if (!isSeeking) return;
-        moveEvent.preventDefault();
-        seekTargetProgress = getProgressFromEvent(moveEvent);
-        updateUI(seekTargetProgress);
-      }
-
-      function onPointerUp(upEvent) {
-        window.removeEventListener("pointermove", onPointerMove);
-        window.removeEventListener("pointerup", onPointerUp);
-        window.removeEventListener("mousemove", onPointerMove);
-        window.removeEventListener("mouseup", onPointerUp);
-        window.removeEventListener("touchmove", onPointerMove);
-        window.removeEventListener("touchend", onPointerUp);
-
-        if (!isSeeking) return;
-        seekTargetProgress = getProgressFromEvent(upEvent);
-        updateUI(seekTargetProgress);
-
-        const duration = Spicetify?.Player?.getDuration?.() || 0;
-        if (duration > 0) {
-          const targetMs = Math.round(seekTargetProgress * duration);
-          Spicetify.Player.seek(targetMs);
-        }
-
-        slider.classList.remove("Dragging");
-
-        clearTimeout(seekLockTimer);
-        seekLockTimer = setTimeout(() => {
-          isSeeking = false;
-          slider.classList.remove("is-scrubbing");
-        }, 380);
-      }
-
-      window.addEventListener("pointermove", onPointerMove, { passive: false });
-      window.addEventListener("pointerup", onPointerUp);
-      window.addEventListener("mousemove", onPointerMove, { passive: false });
-      window.addEventListener("mouseup", onPointerUp);
-      window.addEventListener("touchmove", onPointerMove, { passive: false });
-      window.addEventListener("touchend", onPointerUp);
-    }
-
-    slider.addEventListener("pointerdown", onPointerDown);
-    slider.addEventListener("mousedown", onPointerDown);
-
-    // Guard against background ticker overwriting progress during seek / lock window
-    const origSetProperty = slider.style.setProperty;
-    slider.style.setProperty = function (prop, val, pri) {
-      if (prop === "--SliderProgress" && isSeeking) {
-        return;
-      }
-      return origSetProperty.call(this, prop, val, pri);
-    };
-  }
-
   let syncScheduled = false;
   function syncSpicyControls() {
     const page = document.getElementById("SpicyLyricsPage");
     if (!page) return;
+
+    installOptimisticSeekWrapper();
 
     // Prevent SpicyLyrics CompactMode from breaking desktop fullscreen layout
     if (page.classList.contains("Fullscreen")) {
@@ -813,16 +782,69 @@
 
     const header = page.querySelector(".NowBar .Header");
     const tl = page.querySelector(".Timeline");
-    let pc = page.querySelector(".PlaybackControls");
-
-    // Eagerly trigger PlaybackControls creation if SpicyLyrics hasn't spawned it yet
-    if (!pc) {
-      const mb = page.querySelector(".MediaBox");
-      if (mb) {
-        mb.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
-        mb.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
-        pc = page.querySelector(".PlaybackControls");
+    const allPcs = page.querySelectorAll(".PlaybackControls");
+    let pc = allPcs[0] || null;
+    if (allPcs.length > 1) {
+      for (let i = 1; i < allPcs.length; i++) {
+        allPcs[i].remove();
       }
+    }
+
+    // Ensure PlaybackControls exists in header
+    if (!pc && header) {
+      pc = document.createElement("div");
+      pc.className = "PlaybackControls";
+      pc.innerHTML = `
+        <button class="PlaybackControl ShuffleToggle" title="随机播放">
+          <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+        </button>
+        <button class="PlaybackControl TrackSkip PrevTrack" title="上一首">
+          <svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="4" x2="5" y2="20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="PlaybackControl PlayStateToggle" title="播放/暂停">
+          <svg class="icon-play" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4"/></svg>
+          <svg class="icon-pause" viewBox="0 0 24 24" style="display:none;"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+        </button>
+        <button class="PlaybackControl TrackSkip NextTrack" title="下一首">
+          <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="4" x2="19" y2="20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+        </button>
+        <button class="PlaybackControl LoopToggle" title="循环播放">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        </button>
+      `;
+      pc.querySelector(".ShuffleToggle")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.toggleShuffle();
+      });
+      pc.querySelector(".PrevTrack")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.back();
+      });
+      pc.querySelector(".PlayStateToggle")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.playPause();
+      });
+      pc.querySelector(".NextTrack")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.next();
+      });
+      pc.querySelector(".LoopToggle")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        Spicetify.Player.toggleRepeat();
+      });
+    }
+
+    if (pc) {
+      const isPlaying = Spicetify.Player.isPlaying();
+      const playIcon = pc.querySelector(".icon-play");
+      const pauseIcon = pc.querySelector(".icon-pause");
+      if (playIcon && pauseIcon) {
+        playIcon.style.display = isPlaying ? "none" : "block";
+        pauseIcon.style.display = isPlaying ? "block" : "none";
+      }
+      pc.querySelector(".PlayStateToggle")?.classList.toggle("Playing", isPlaying);
+      pc.querySelector(".ShuffleToggle")?.classList.toggle("Enabled", !!Spicetify.Player.getShuffle?.());
+      pc.querySelector(".LoopToggle")?.classList.toggle("Enabled", (Spicetify.Player.getRepeat?.() || 0) > 0);
     }
 
     // 1. Re-parent Timeline & PlaybackControls into NowBar Header in correct order
@@ -836,9 +858,6 @@
     if (header && pc && pc.parentElement !== header) {
       header.appendChild(pc);
     }
-
-    // Initialize silky smooth timeline scrubber
-    setupTimelineScrubber(page);
 
     // Suppress tooltips on PlaybackControls
     if (pc) {

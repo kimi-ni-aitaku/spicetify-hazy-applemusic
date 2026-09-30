@@ -3620,9 +3620,24 @@ button[data-testid="trashbin-button"],
   pointer-events: none !important;
 }
 
-#SpicyLyricsPage.Fullscreen .ContentBox .NowBar,
-#SpicyLyricsPage.Fullscreen.CompactMode .ContentBox .NowBar,
-#SpicyLyricsPage.Fullscreen.ForcedCompactMode .ContentBox .NowBar {
+/* Hide NowBar completely when user toggles cover off (Pure Lyrics / Compact) or when inactive */
+#SpicyLyricsPage.NowBarStatus__Closed .ContentBox .NowBar,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .ContentBox .NowBar,
+#SpicyLyricsPage .ContentBox .NowBar:not(.Active),
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar:not(.Active) {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+#SpicyLyricsPage.NowBarStatus__Closed,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed {
+  --LyricsLeftSidePadding: 0px !important;
+  --LyricsRightSidePadding: 0px !important;
+}
+
+#SpicyLyricsPage.Fullscreen:not(.NowBarStatus__Closed) .ContentBox .NowBar.Active {
   padding-top: 0 !important;
   margin-top: 0 !important;
   inset: auto !important;
@@ -3749,7 +3764,7 @@ button[data-testid="trashbin-button"],
   white-space: nowrap !important;
 }
 
-/* Timeline (macOS Apple Music Progress Slider) */
+/* Timeline (macOS 26/27 Liquid Glass Progress Slider) */
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline,
 #SpicyLyricsPage.Fullscreen.CompactMode .ContentBox .NowBar .Header .Timeline {
@@ -3772,10 +3787,11 @@ button[data-testid="trashbin-button"],
 
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .Time,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline .Time {
-  font-size: 0.8rem !important;
+  font-size: 0.78rem !important;
   font-weight: 500 !important;
-  color: rgba(255, 255, 255, 0.55) !important;
+  color: rgba(255, 255, 255, 0.6) !important;
   font-variant-numeric: tabular-nums !important;
+  letter-spacing: 0.02em !important;
   min-width: 34px !important;
   text-align: center !important;
   padding: 0 !important;
@@ -3786,21 +3802,41 @@ button[data-testid="trashbin-button"],
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline .SliderBar {
   flex: 1 1 0% !important;
-  height: 4px !important;
-  background: rgba(255, 255, 255, 0.18) !important;
+  height: 6px !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.18) !important;
   border-radius: 9999px !important;
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.28), inset 0 -1px 1px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.25) !important;
   position: relative !important;
   cursor: pointer !important;
   margin: 0 !important;
   overflow: visible !important;
-  transition: height 0.18s cubic-bezier(0.2, 0, 0, 1) !important;
+  transition: height 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+/* 34px generous invisible hitbox for effortless scrubbing */
+#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar::after,
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline .SliderBar::after {
+  content: "" !important;
+  position: absolute !important;
+  top: -14px !important;
+  bottom: -14px !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 34px !important;
+  cursor: pointer !important;
+  z-index: 2 !important;
 }
 
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar:hover,
-#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.is-scrubbing,
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.Dragging,
+#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.is-scrubbing,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline:hover .SliderBar {
-  height: 6px !important;
+  height: 8px !important;
+  background: rgba(255, 255, 255, 0.18) !important;
+  box-shadow: inset 0 1px 1.5px rgba(255, 255, 255, 0.35), inset 0 -1px 1px rgba(0, 0, 0, 0.2), 0 3px 12px rgba(0, 0, 0, 0.35) !important;
 }
 
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar::before,
@@ -3808,18 +3844,22 @@ button[data-testid="trashbin-button"],
   content: "" !important;
   position: absolute !important;
   inset: 0 !important;
-  background: rgba(255, 255, 255, 0.92) !important;
   border-radius: 9999px !important;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.95) 75%, #ffffff 100%) !important;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.7) !important;
   transform: scaleX(var(--SliderProgress, 0)) !important;
   transform-origin: left center !important;
   pointer-events: none !important;
   transition: transform 0.12s linear !important;
 }
 
+#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar:hover::before,
+#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.Dragging::before,
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.is-scrubbing::before,
-#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.Dragging::before {
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline:hover .SliderBar::before {
   transition: none !important;
-  background: #ffffff !important;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.92) 0%, #ffffff 100%) !important;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.75), inset 0 1px 1px #ffffff !important;
 }
 
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar .Handle,
@@ -3827,28 +3867,32 @@ button[data-testid="trashbin-button"],
   position: absolute !important;
   top: 50% !important;
   left: calc(var(--SliderProgress, 0) * 100%) !important;
-  transform: translate(-50%, -50%) scale(0.6) !important;
-  width: 12px !important;
-  height: 12px !important;
+  width: 14px !important;
+  height: 14px !important;
   border-radius: 50% !important;
   background: #ffffff !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45), 0 0 1px rgba(0, 0, 0, 0.25) !important;
-  opacity: 0 !important;
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(0, 0, 0, 0.45), inset 0 1px 1.5px rgba(255, 255, 255, 1) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.35) !important;
+  transform: translate(-50%, -50%) scale(0.65) !important;
+  opacity: 0.35 !important;
   pointer-events: none !important;
-  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.2, 0, 0, 1) !important;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease !important;
+  z-index: 3 !important;
 }
 
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar:hover .Handle,
 #SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline:hover .SliderBar .Handle {
   opacity: 1 !important;
   transform: translate(-50%, -50%) scale(1) !important;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 1), 0 3px 10px rgba(0, 0, 0, 0.4) !important;
 }
 
+#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.Dragging .Handle,
 #SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.is-scrubbing .Handle,
-#SpicyLyricsPage.Fullscreen .NowBar .Timeline .SliderBar.Dragging .Handle {
+#SpicyLyricsPage.Fullscreen .ContentBox .NowBar .Header .Timeline .SliderBar.Dragging .Handle {
   opacity: 1 !important;
   transform: translate(-50%, -50%) scale(1.25) !important;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6) !important;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 1), 0 4px 14px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Playback Controls: Apple Music Centered Horizontal Row */
@@ -3986,7 +4030,7 @@ button[data-testid="trashbin-button"],
 }
 
 @media (max-width: 800px) {
-  #SpicyLyricsPage.Fullscreen {
+  #SpicyLyricsPage.Fullscreen:not(.NowBarStatus__Closed) {
     --NowBarWidth: clamp(220px, 40cqw, 340px) !important;
     --NowBarLeftSpacing: calc(max(16px, (48cqw - var(--NowBarWidth)) / 2)) !important;
     --LyricsLeftSidePadding: calc(var(--NowBarLeftSpacing) + var(--NowBarWidth) + 20px) !important;
@@ -4167,22 +4211,40 @@ button[data-testid="trashbin-button"],
 
 #ApplePureLyricsBottomBar .PureLyricsTrack {
   flex: 1 !important;
-  height: 4px !important;
-  background: rgba(255, 255, 255, 0.18) !important;
+  height: 5px !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.15) !important;
   border-radius: 9999px !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), inset 0 -1px 1px rgba(0, 0, 0, 0.15) !important;
   cursor: pointer !important;
   position: relative !important;
-  overflow: hidden !important;
-  transition: height 0.15s ease !important;
+  overflow: visible !important;
+  transition: height 0.18s ease !important;
+}
+
+#ApplePureLyricsBottomBar .PureLyricsTrack::after {
+  content: "" !important;
+  position: absolute !important;
+  top: -12px !important;
+  bottom: -12px !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 29px !important;
+  cursor: pointer !important;
+  z-index: 2 !important;
 }
 
 #ApplePureLyricsBottomBar .PureLyricsTrack:hover {
-  height: 6px !important;
+  height: 7px !important;
+  background: rgba(255, 255, 255, 0.22) !important;
 }
 
 #ApplePureLyricsBottomBar .PureLyricsProgress {
   height: 100% !important;
-  background: rgba(255, 255, 255, 0.85) !important;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.85) 0%, #ffffff 100%) !important;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5) !important;
   border-radius: 9999px !important;
   pointer-events: none !important;
   transition: width 0.1s linear !important;
