@@ -3565,22 +3565,23 @@ button[data-testid="trashbin-button"],
   stroke: #ffffff !important;
 }
 
-/* Button Visibility Rules */
-#SpicyLyricsPage #CompactModeToggle,
+/* Button Visibility Rules: Keep only the 3 Core Functional Buttons */
 #SpicyLyricsPage #NowBarToggle,
-#SpicyLyricsPage #NowBarSideToggle,
 #SpicyLyricsPage #RomanizationToggle,
 #SpicyLyricsPage #Close {
   display: inline-flex !important;
   cursor: pointer !important;
 }
 
-/* Explicitly Remove Settings Toggle (Cancel Settings Button) */
+/* Hide unneeded secondary controls & settings */
 #SpicyLyricsPage #SettingsToggle,
-#SpicyLyricsPage button#SettingsToggle {
-  display: none !important;
-}
-
+#SpicyLyricsPage button#SettingsToggle,
+#SpicyLyricsPage #CompactModeToggle,
+#SpicyLyricsPage button#CompactModeToggle,
+#SpicyLyricsPage #NowBarSideToggle,
+#SpicyLyricsPage button#NowBarSideToggle,
+#SpicyLyricsPage #CinemaView,
+#SpicyLyricsPage button#CinemaView,
 #SpicyLyricsPage #FullscreenToggle,
 #SpicyLyricsPage button#FullscreenToggle,
 #SpicyLyricsPage #LyricsManager,
