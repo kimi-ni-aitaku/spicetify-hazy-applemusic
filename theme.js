@@ -287,13 +287,31 @@
     };
   })();
 
-  // Optimistic Seek Wrapper: Prevents Spotify async seek position snapback / jitter
-  let optimisticProgress = null;
+  // High-Precision Optimistic Seek State Proxy:
+  // Intercepts Spotify PlayerAPI seeking & asynchronous state emission to eliminate
+  // snapback / rollback in SpicyLyrics animation frame loop, timeline slider, and lyric sync.
+  let optimisticTargetMs = null;
+  let optimisticSetTime = 0;
   let optimisticUntil = 0;
 
   function applyOptimisticSeek(targetMs) {
-    optimisticProgress = targetMs;
-    optimisticUntil = Date.now() + 1200;
+    targetMs = Math.round(targetMs);
+    optimisticTargetMs = targetMs;
+    optimisticSetTime = Date.now();
+    optimisticUntil = Date.now() + 1500;
+
+    // Immediately update PlayerAPI internal state snapshots so SpicyLyrics polling gets targetMs
+    const api = Spicetify.Platform?.PlayerAPI;
+    if (api?._state) {
+      api._state.positionAsOfTimestamp = targetMs;
+      api._state.timestamp = optimisticSetTime;
+    }
+    if (Spicetify.Player?.origin?._state && Spicetify.Player.origin !== api) {
+      Spicetify.Player.origin._state.positionAsOfTimestamp = targetMs;
+      Spicetify.Player.origin._state.timestamp = optimisticSetTime;
+    }
+
+    // Immediately update DOM Timeline SliderBar & Position text
     const dur = Spicetify.Player.getDuration() || 1;
     const pct = Math.max(0, Math.min(1, targetMs / dur));
     document.querySelectorAll("#SpicyLyricsPage .SliderBar").forEach((sb) => {
@@ -302,6 +320,15 @@
     document.querySelectorAll("#SpicyLyricsPage .NowBar .Timeline .Time.Position").forEach((el) => {
       el.textContent = Spicetify.Player.formatTime(targetMs);
     });
+
+    // Also update Pure Lyrics bottom dock if active
+    const pureBar = document.getElementById("ApplePureLyricsBottomBar");
+    if (pureBar) {
+      const prog = pureBar.querySelector(".PureLyricsProgress");
+      if (prog) prog.style.width = `${pct * 100}%`;
+      const curTime = pureBar.querySelector(".time-cur");
+      if (curTime) curTime.textContent = Spicetify.Player.formatTime(targetMs);
+    }
   }
 
   function protectSliderBar(sb) {
@@ -309,12 +336,22 @@
     sb.__protectInstalled = true;
     const origSetProperty = sb.style.setProperty.bind(sb.style);
     sb.style.setProperty = function (prop, val, prio) {
-      if (prop === "--SliderProgress" && optimisticProgress !== null && Date.now() < optimisticUntil) {
-        const dur = Spicetify.Player.getDuration() || 1;
-        const targetPct = optimisticProgress / dur;
-        const incoming = parseFloat(val);
-        if (!isNaN(incoming) && Math.abs(incoming - targetPct) > 0.03) {
-          return origSetProperty(prop, targetPct.toString(), prio);
+      if (prop === "--SliderProgress" && optimisticTargetMs !== null) {
+        const now = Date.now();
+        if (now < optimisticUntil) {
+          const dur = Spicetify.Player.getDuration() || 1;
+          const isPaused = Spicetify.Player.isPlaying ? !Spicetify.Player.isPlaying() : false;
+          const elapsed = isPaused ? 0 : now - optimisticSetTime;
+          const expected = optimisticTargetMs + elapsed;
+          const targetPct = expected / dur;
+          const incoming = parseFloat(val);
+          if (!isNaN(incoming) && Math.abs(incoming - targetPct) > 0.03) {
+            return origSetProperty(prop, targetPct.toString(), prio);
+          } else if (!isNaN(incoming)) {
+            optimisticTargetMs = null;
+          }
+        } else {
+          optimisticTargetMs = null;
         }
       }
       return origSetProperty(prop, val, prio);
@@ -322,41 +359,118 @@
   }
 
   function installOptimisticSeekWrapper() {
-    if (!Spicetify?.Player?.seek || !Spicetify?.Player?.getProgress) return;
-    if (Spicetify.Player.__optimisticSeekInstalled) return;
-    Spicetify.Player.__optimisticSeekInstalled = true;
+    const api = Spicetify?.Platform?.PlayerAPI;
+    if (!api) {
+      setTimeout(installOptimisticSeekWrapper, 50);
+      return;
+    }
 
-    const origSeek = Spicetify.Player.seek;
-    Spicetify.Player.seek = function (count) {
-      const duration = Spicetify.Player.getDuration() || 0;
-      const targetMs = count <= 1 && duration > 0 ? Math.round(count * duration) : Math.round(count);
-      applyOptimisticSeek(targetMs);
-      return origSeek.call(this, count);
-    };
-
-    if (Spicetify.Player.origin?.seekTo) {
-      const origSeekTo = Spicetify.Player.origin.seekTo.bind(Spicetify.Player.origin);
-      Spicetify.Player.origin.seekTo = function (ms) {
-        applyOptimisticSeek(Math.round(ms));
+    // 1. Hook seekTo on PlayerAPI / Player.origin
+    if (!api.__origSeekToHooked && api.seekTo) {
+      api.__origSeekToHooked = true;
+      const origSeekTo = api.seekTo.bind(api);
+      api.seekTo = function (ms) {
+        applyOptimisticSeek(ms);
         return origSeekTo(ms);
+      };
+      if (Spicetify.Player?.origin && Spicetify.Player.origin !== api) {
+        Spicetify.Player.origin.seekTo = api.seekTo;
+      }
+    }
+
+    // 2. Hook Spicetify.Player.seek
+    if (Spicetify.Player?.seek && !Spicetify.Player.__origSeekHooked) {
+      Spicetify.Player.__origSeekHooked = true;
+      const origSeek = Spicetify.Player.seek;
+      Spicetify.Player.seek = function (count) {
+        const duration = Spicetify.Player.getDuration() || 0;
+        const targetMs = count <= 1 && duration > 0 ? Math.round(count * duration) : Math.round(count);
+        applyOptimisticSeek(targetMs);
+        return origSeek.call(this, count);
       };
     }
 
-    const origGetProgress = Spicetify.Player.getProgress;
-    Spicetify.Player.getProgress = function () {
-      if (optimisticProgress !== null) {
-        if (Date.now() < optimisticUntil) {
-          const real = origGetProgress.call(this);
-          if (Math.abs(real - optimisticProgress) < 1000) {
-            optimisticProgress = null;
-            return real;
+    // 3. Define getter & setter on PlayerAPI._state to intercept stale Spotify updates
+    if (!api.__stateHooked) {
+      api.__stateHooked = true;
+      let currentState = api._state;
+      Object.defineProperty(api, "_state", {
+        get() {
+          return currentState;
+        },
+        set(newState) {
+          if (newState && optimisticTargetMs !== null) {
+            const now = Date.now();
+            if (now < optimisticUntil) {
+              const isPaused = newState.isPaused ?? false;
+              const elapsed = isPaused ? 0 : now - optimisticSetTime;
+              const expected = optimisticTargetMs + elapsed;
+              const incomingEst = isPaused
+                ? newState.positionAsOfTimestamp
+                : newState.positionAsOfTimestamp + (now - newState.timestamp);
+
+              if (Math.abs(incomingEst - expected) > 1200) {
+                // Stale packet from audio backend prior to seek completion!
+                newState.positionAsOfTimestamp = Math.round(expected);
+                newState.timestamp = now;
+              } else {
+                // Spotify backend has caught up to the sought timestamp!
+                optimisticTargetMs = null;
+              }
+            } else {
+              optimisticTargetMs = null;
+            }
           }
-          return optimisticProgress;
+          currentState = newState;
+        },
+        configurable: true,
+        enumerable: true
+      });
+    }
+
+    // 4. Hook Spicetify.Player.getProgress
+    if (Spicetify.Player?.getProgress && !Spicetify.Player.__getProgressHooked) {
+      Spicetify.Player.__getProgressHooked = true;
+      const origGetProgress = Spicetify.Player.getProgress;
+      Spicetify.Player.getProgress = function () {
+        if (optimisticTargetMs !== null) {
+          const now = Date.now();
+          if (now < optimisticUntil) {
+            const isPaused = Spicetify.Player.isPlaying ? !Spicetify.Player.isPlaying() : false;
+            return Math.round(optimisticTargetMs + (isPaused ? 0 : now - optimisticSetTime));
+          }
+          optimisticTargetMs = null;
         }
-        optimisticProgress = null;
-      }
-      return origGetProgress.call(this);
-    };
+        return origGetProgress.call(this);
+      };
+    }
+
+    // 5. Hook PlayerAPI._contextPlayer.getPositionState (called directly by SpicyLyrics 60fps sync engine)
+    if (api._contextPlayer && !api._contextPlayer.__getPositionStateHooked && api._contextPlayer.getPositionState) {
+      api._contextPlayer.__getPositionStateHooked = true;
+      const origGetPosState = api._contextPlayer.getPositionState.bind(api._contextPlayer);
+      api._contextPlayer.getPositionState = async function (options) {
+        const res = await origGetPosState(options);
+        if (res && optimisticTargetMs !== null) {
+          const now = Date.now();
+          if (now < optimisticUntil) {
+            const isPaused = Spicetify.Player.isPlaying ? !Spicetify.Player.isPlaying() : false;
+            const elapsed = isPaused ? 0 : now - optimisticSetTime;
+            const expected = optimisticTargetMs + elapsed;
+            const actual = Number(res.position);
+            if (!isNaN(actual) && Math.abs(actual - expected) > 1200) {
+              const patchedPos = typeof res.position === "bigint" ? BigInt(Math.round(expected)) : Math.round(expected);
+              return { ...res, position: patchedPos, timestamp: now };
+            } else if (!isNaN(actual)) {
+              optimisticTargetMs = null;
+            }
+          } else {
+            optimisticTargetMs = null;
+          }
+        }
+        return res;
+      };
+    }
   }
 
   installOptimisticSeekWrapper();
@@ -402,8 +516,28 @@
       const p = loc?.pathname || Spicetify.Platform?.History?.location?.pathname;
       if (p && p !== "/lyrics" && p !== "/SpicyLyrics") {
         lastNonLyricsRoute = p;
+      } else if (p === "/lyrics" || p === "/SpicyLyrics") {
+        setTimeout(ensureFullscreenLyrics, 40);
       }
     });
+  }
+
+  // Auto-promote any navigation to /SpicyLyrics or /lyrics directly to Fullscreen
+  function ensureFullscreenLyrics() {
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      const page = document.getElementById("SpicyLyricsPage");
+      if (page) {
+        if (!page.classList.contains("Fullscreen")) {
+          const cinema = page.querySelector("#CinemaView") || document.getElementById("SpicyLyrics_FullscreenButton");
+          if (cinema) cinema.click();
+        }
+        clearInterval(interval);
+      } else if (attempts >= 30) {
+        clearInterval(interval);
+      }
+    }, 40);
   }
 
   // Default SpicyLyrics state to Apple Music left-split & opened NowBar
@@ -418,27 +552,74 @@
     }
   } catch (e) {}
 
+  // Ensure only one lyrics mode (Apple Music Fullscreen Lyrics) is retained
+  try {
+    const rawSettings = Spicetify.LocalStorage.get("SL:settings");
+    const settings = rawSettings ? JSON.parse(rawSettings) : {};
+    let changed = false;
+    if (!settings.removeSpotifyLyricsButton) {
+      settings.removeSpotifyLyricsButton = true;
+      changed = true;
+    }
+    if (!settings.disableNpvLyrics) {
+      settings.disableNpvLyrics = true;
+      changed = true;
+    }
+    if (settings.popupLyricsAllowed !== false) {
+      settings.popupLyricsAllowed = false;
+      changed = true;
+    }
+    if (changed) {
+      Spicetify.LocalStorage.set("SL:settings", JSON.stringify(settings));
+    }
+  } catch (e) {}
+
   // Toggle Apple Music Fullscreen Lyrics
   function toggleAppleMusicFullscreen() {
     const page = document.getElementById("SpicyLyricsPage");
     const isFs = page && page.classList.contains("Fullscreen");
     if (isFs) {
       const close = document.getElementById("Close");
+      const cinema = page?.querySelector("#CinemaView");
       if (close) {
         close.click();
-        setTimeout(() => {
-          if (Spicetify.Platform?.History?.push) {
-            Spicetify.Platform.History.push(lastNonLyricsRoute || "/");
-          }
-        }, 50);
+      } else if (cinema) {
+        cinema.click();
+      }
+      setTimeout(() => {
+        const curPath = Spicetify.Platform?.History?.location?.pathname;
+        if (curPath === "/SpicyLyrics" || curPath === "/lyrics") {
+          Spicetify.Platform?.History?.push(lastNonLyricsRoute || "/");
+        }
+      }, 50);
+      return;
+    }
+
+    if (page) {
+      const cinema = page.querySelector("#CinemaView") || document.getElementById("SpicyLyrics_FullscreenButton");
+      if (cinema) {
+        cinema.click();
         return;
       }
     }
-    const fsBtn = document.getElementById("SpicyLyrics_FullscreenButton");
-    if (fsBtn) {
-      fsBtn.click();
+    if (Spicetify.Platform?.History?.push) {
+      Spicetify.Platform.History.push("/SpicyLyrics");
     }
   }
+
+  // Intercept click on the playbar lyrics button so it ALWAYS opens Apple Music Fullscreen
+  document.addEventListener(
+    "click",
+    (event) => {
+      const pageBtn = event.target.closest("#SpicyLyrics_PageButton");
+      if (pageBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleAppleMusicFullscreen();
+      }
+    },
+    true
+  );
 
   // Handle direct click on [ ✕ ] close button in lyrics capsule
   document.addEventListener(
@@ -446,10 +627,31 @@
     (event) => {
       if (event.target.closest("#Close")) {
         setTimeout(() => {
-          if (Spicetify.Platform?.History?.push) {
-            Spicetify.Platform.History.push(lastNonLyricsRoute || "/");
+          const curPath = Spicetify.Platform?.History?.location?.pathname;
+          if (curPath === "/SpicyLyrics" || curPath === "/lyrics") {
+            Spicetify.Platform?.History?.push(lastNonLyricsRoute || "/");
           }
         }, 50);
+      }
+    },
+    true
+  );
+
+  // Fix CJK / multi-char lyrics seek clicks: ensure clicking anywhere on a line or letterGroup seeks accurately
+  document.addEventListener(
+    "click",
+    (e) => {
+      const line = e.target.closest?.(".LyricsContent .line");
+      if (!line) return;
+      if (
+        e.target.classList.contains("letterGroup") ||
+        e.target.classList.contains("word-group")
+      ) {
+        const clickable = e.target.querySelector(".Emphasis, .word") || line;
+        if (clickable && clickable !== e.target) {
+          e.stopPropagation();
+          clickable.click();
+        }
       }
     },
     true
@@ -898,6 +1100,21 @@
     if (!page) return;
 
     installOptimisticSeekWrapper();
+
+    // Auto-promote any un-fullscreened page view into Fullscreen
+    if (!page.classList.contains("Fullscreen")) {
+      const cinema = page.querySelector("#CinemaView") || document.getElementById("SpicyLyrics_FullscreenButton");
+      if (cinema) cinema.click();
+    }
+
+    // Hide redundant fullscreen button in the playbar so strictly ONE lyrics button exists
+    const fsBtn = document.getElementById("SpicyLyrics_FullscreenButton");
+    if (fsBtn && fsBtn.style.display !== "none") {
+      fsBtn.style.setProperty("display", "none", "important");
+      fsBtn.style.setProperty("visibility", "hidden", "important");
+      fsBtn.style.setProperty("width", "0", "important");
+      fsBtn.style.setProperty("pointer-events", "none", "important");
+    }
 
     // Clean up stuck compact mode so lyrics stay vertically centered
     if (page.classList.contains("CompactMode") || page.classList.contains("ForcedCompactMode")) {

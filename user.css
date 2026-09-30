@@ -3631,10 +3631,70 @@ button[data-testid="trashbin-button"],
   pointer-events: none !important;
 }
 
+/* Retain ONLY SpicyLyrics full-screen lyrics: Hide redundant Spotify native lyrics button, popup lyrics & duplicate fullscreen button */
+button[data-testid="lyrics-button"],
+[data-testid="lyrics-button"]:not(.SpicyLyrics_PlaybarButton),
+button[aria-label="歌词"]:not(.SpicyLyrics_PlaybarButton),
+#SpicyLyrics_PopupLyricsButton,
+#SpicyLyrics_FullscreenButton {
+  display: none !important;
+}
+
+/* Pure Lyrics (No-Picture) Mode: Apple Music Centered Typography & Vertical Balancing */
 #SpicyLyricsPage.NowBarStatus__Closed,
 #SpicyLyricsPage.Fullscreen.NowBarStatus__Closed {
-  --LyricsLeftSidePadding: 0px !important;
-  --LyricsRightSidePadding: 0px !important;
+  --LyricsLeftSidePadding: max(32px, calc(50cqw - 340px)) !important;
+  --LyricsRightSidePadding: max(32px, calc(50cqw - 340px)) !important;
+  --DefaultLyricsSize: clamp(1.85rem, 3.2cqw, 2.45rem) !important;
+}
+
+#SpicyLyricsPage.NowBarStatus__Closed .ContentBox .NowBar,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .ContentBox .NowBar,
+#SpicyLyricsPage.NowBarStatus__Closed .MediaBox,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .MediaBox {
+  display: none !important;
+  width: 0 !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+  flex: 0 0 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+
+#SpicyLyricsPage.NowBarStatus__Closed .LyricsContainer,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .LyricsContainer {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+}
+
+#SpicyLyricsPage.NowBarStatus__Closed .LyricsContainer .LyricsContent .simplebar-content-wrapper .SpicyLyricsScrollContainer,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .LyricsContainer .LyricsContent .simplebar-content-wrapper .SpicyLyricsScrollContainer {
+  padding-left: var(--LyricsLeftSidePadding) !important;
+  padding-right: var(--LyricsRightSidePadding) !important;
+  padding-top: 38cqh !important;
+  padding-bottom: 50cqh !important;
+  box-sizing: border-box !important;
+}
+
+#SpicyLyricsPage.NowBarStatus__Closed .LyricsContainer .LyricsContent .line,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .LyricsContainer .LyricsContent .line {
+  font-size: var(--DefaultLyricsSize) !important;
+  line-height: 1.42 !important;
+  margin-bottom: 0.65em !important;
+  letter-spacing: -0.015em !important;
+  max-width: 720px !important;
+  text-wrap: balance !important;
+}
+
+#SpicyLyricsPage.NowBarStatus__Closed .LyricsContainer .LyricsContent .Credits,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .LyricsContainer .LyricsContent .Credits,
+#SpicyLyricsPage.NowBarStatus__Closed .LyricsContainer .LyricsContent .LyricsProvider,
+#SpicyLyricsPage.Fullscreen.NowBarStatus__Closed .LyricsContainer .LyricsContent .LyricsProvider {
+  max-width: 720px !important;
+  margin-left: 0 !important;
+  padding-bottom: 32px !important;
 }
 
 #SpicyLyricsPage.Fullscreen:not(.NowBarStatus__Closed) {
