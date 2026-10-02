@@ -18,8 +18,8 @@
 - **中文字词点击穿透增强**：全面适配中文多字结构与注音分词，任意汉字与空白间隙均可即点即跳。
 
 ### 3. 🎵 严格单一全屏歌词体验 (Strict Single Lyrics View)
-- **剔除多余歌词入口**：隐藏 Spotify 原生歌词、SpicyLyrics 嵌入式页面歌词及悬浮画中画歌词，底栏右侧操作区**仅保留单一歌词按钮**。
-- **全局一键直达**：点击播放栏歌词按钮或点击左下角封面，直接呼出 Apple Music 全屏沉浸歌词；关闭时干净退回当前浏览页面，不留任何多余中间态。
+- **剔除多余歌词入口**：隐藏 Spotify 原生歌词按钮与 SpicyLyrics 注入播放栏的全部歌词按钮（含画中画/全屏入口），界面保持纯净；进入歌词的唯一入口为左下角封面。
+- **全局一键直达**：点击左下角正在播放的封面，直接呼出 Apple Music 全屏沉浸歌词；关闭时干净退回当前浏览页面，不留任何多余中间态。
 
 ### 4. 🎛️ 经典高精度进度条与三合一播控 (Classic Timeline & 3-in-1 Controls)
 - **经典高精度进度条**：还原最初插件备受好评的细腻进度条与分秒实时时间指示。
@@ -48,8 +48,8 @@
 - **剔除多余滚动条**：全屏模式下彻底隐藏右侧滚动条（SimpleBar / WebKit Scrollbar），视觉边界纯净无瑕疵。
 
 ### 10. ⚡ 极致性能引擎：告别首页与歌词缩放拖拽卡顿 (Zero-Lag Resize Engine)
-- **动态拖拽拦截系统（Zero-Lag Drag Engine）**：通过全局 `body.is-resizing` 状态监听，在鼠标拖拽/缩放窗口瞬间**全面暂停所有 DOM 过渡动画、CSS 重绘、重度毛玻璃（backdrop-filter）与阴影**，窗口尺寸变化零掉帧、丝滑跟随鼠标。
-- **首页货架布局隔离（Layout Containment）**：为首页所有推荐卡片栏与货架（`[data-testid="component-shelf"]`, `.main-shelf-shelf`）开启 CSS `contain: layout style`，彻底杜绝单行卡片宽度变动引发的全页面级重排风暴（Reflow Thrashing）。
+- **动态拖拽拦截系统（Zero-Lag Drag Engine）**：监听窗口 resize 事件，在拖拽/缩放期间给 `<body>` 挂载 `is-resizing` 状态：全面停用所有毛玻璃（backdrop-filter）与渐变遮罩（mask-image），专辑背景的模糊滤镜从 24px **缓动降级**至 10px（保持磨砂观感不变清晰），停止拖拽 200ms 后平滑恢复原状。
+- **首页货架布局隔离（Layout Containment）**：为首页所有推荐卡片栏与货架（`[data-testid="component-shelf"]`, `.main-shelf-shelf`）开启 CSS `contain: layout style` + `content-visibility: auto`，彻底杜绝单行卡片宽度变动引发的全页面级重排风暴（Reflow Thrashing）。
 - **消除双重重叠毛玻璃**：取消主视口内部容器（`.main-view-container`）的多余毛玻璃与阴影图层，仅保留最外层单层高质感磨砂，大幅释放 GPU 显存带宽与 Fill Rate。
 - **剔除同步滚动重流（Layout Thrashing）**：重构 `galaxyFade` 滚动监听器与 `ResizeObserver`，消除窗口尺寸变化时在非歌词页面对 `scrollHeight` / `calculateLyricsMaxWidth` 的强制同步读取，保持 60/120fps ProMotion 极致流畅。
 
@@ -105,11 +105,41 @@ irm https://raw.githubusercontent.com/kimi-ni-aitaku/spicetify-hazy-applemusic/m
 ---
 
 ## 💡 快捷键与常用操作
-- **进入全屏歌词**：点击底栏右侧「歌词按钮」或左下角「正在播放的封面」。
-- **退出全屏歌词**：按键盘 `ESC`、点击右上角 `[ ✕ ]` 或再次点击播放栏「歌词按钮」。
+- **进入全屏歌词**：点击左下角「正在播放的封面」。
+- **退出全屏歌词**：按键盘 `ESC`、点击右上角 `[ ✕ ]`，或再次点击左下角封面。
 - **切换无图纯歌词模式**：点击右上角 `[ ◫ ]` 按钮。
 - **切换注音模式**：点击右上角 `[ 文A ]` 按钮。
 - **切换播放模式**：点击封面下方或无图底栏的播放模式按钮，在「顺序播放 ➔ 随机播放 ➔ 单曲循环」之间一键切换。
+
+---
+
+## 🛠 故障排查与开关
+
+### 关闭防回弹跳转补丁（逃生开关）
+主题对 Spotify 播放内核做了预测式跳转补丁。如果 Spotify/Spicetify 更新后歌词同步出现异常，可在 DevTools 控制台（Spicetify 默认已开启，`Ctrl+Shift+I` / `Cmd+Option+I`）执行：
+
+```js
+localStorage.setItem("hazy:disableOptimisticSeek", "true");
+```
+
+然后重启 Spotify（或执行 `spicetify apply`）。补丁会完全跳过，代价仅为拖动进度条时歌词可能有一瞬回弹。恢复补丁：
+
+```js
+localStorage.removeItem("hazy:disableOptimisticSeek");
+```
+
+补丁本身也带自动降级保护：安装过程抛错时会自动禁用并在控制台输出 `[Hazy] optimistic seek wrapper disabled due to error`，不会冻住歌词。
+
+### 🩹 本版本修复日志（2025）
+- 修复新版 Spicetify `isPlaying` 属性化导致逐字歌词动画冻结（统一封装为 `getPlayerPaused()`，兼容新旧 API）
+- 实现真正生效的 `body.is-resizing` 缩放零卡顿引擎（含背景模糊缓动降级，不再变清晰）
+- 修复 `Spicetify.Player.seek` 毫秒被误判为比例（歌曲前 1 秒内跳转错位）
+- 修复首次运行可能将 `spicetify-exp-features` 写坏为 `"null"` 的问题
+- 修复 `lyricsObserver.disconnect` 缺少括号导致的 observer 泄漏
+- 修复 matchMedia 代理 bound 函数未缓存导致 `removeEventListener` 失败的监听器泄漏
+- 主色提取改为 RGB 量化桶统计，解决 JPEG 封面统计不出主色、频繁落入兜底蓝灰色的问题
+- 切歌元数据残缺时短路等待重试；头像菜单 Observer 合帧节流
+- SpicyLyrics 播放栏按钮隐藏兼容多版本（CSS 前缀选择器 + JS 兜底扫描）
 
 ---
 
