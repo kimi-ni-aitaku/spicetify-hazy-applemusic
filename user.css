@@ -1,11 +1,15 @@
 /* =========================================================================
    Performance Optimization: Clean CSS button suppression & zero GPU overdraw
+   前缀选择器兼容不同版本 SpicyLyrics 的按钮 ID
    ========================================================================= */
+button[id^="SpicyLyrics"],
 #SpicyLyrics_FullscreenButton,
 #SpicyLyrics_PopupLyricsButton,
 #SpicyLyrics_PageButton,
 button[aria-label="歌词"],
 button[data-testid="lyrics-button"],
+button[aria-label*="Spicy" i],
+button[title*="Spicy" i],
 button.BCyglZU3nRFZ5tXW1Q2Q {
   display: none !important;
 }
@@ -126,7 +130,7 @@ ALBUM ART BACKGROUND
   backface-visibility: hidden;
   transform: translate3d(0, 0, 0);
   will-change: transform;
-  transition: background-image var(--fade-time, 0.4s) ease !important;
+  transition: background-image var(--fade-time, 0.4s) ease, filter 0.2s ease !important;
   opacity: 0.55;
   z-index: 0;
   contain: strict;
@@ -3777,9 +3781,7 @@ button[aria-label="歌词"]:not(.SpicyLyrics_PlaybarButton),
 #SpicyLyricsPage.Fullscreen .CenteredView,
 #SpicyLyricsPage.Fullscreen .Header,
 #SpicyLyricsPage.Fullscreen .MediaBox,
-#SpicyLyricsPage.Fullscreen .MediaContent,
-#SpicyLyricsPage.Fullscreen .LyricsContent,
-#SpicyLyricsPage.Fullscreen .SpicyLyricsScrollContainer {
+#SpicyLyricsPage.Fullscreen .MediaContent {
   transition: none !important;
   animation: none !important;
 }
@@ -4303,3 +4305,38 @@ button[aria-label="歌词"]:not(.SpicyLyrics_PlaybarButton),
 }
 
 
+
+/* =========================================================================
+   Window Resize Zero-Lag Engine (JS 侧在拖拽缩放期间挂 body.is-resizing)
+   停用全部毛玻璃/阴影/滤镜/过渡，避免每帧重新光栅化导致的掉帧
+   ========================================================================= */
+body.is-resizing *,
+body.is-resizing *::before,
+body.is-resizing *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+body.is-resizing * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 背景模糊降级用缓动过渡，拖拽开始/结束时平滑变化而非瞬间跳变 */
+body.is-resizing .Root__top-container::before {
+  transition: filter 0.2s ease !important;
+  filter: blur(10px) contrast(var(--cont, 60%)) saturate(var(--satu, 70%))
+    brightness(var(--bright, 100%)) !important;
+  transform: translate3d(0, 0, 0) scale(1.06) !important;
+  will-change: filter !important;
+}
+
+/* 渐变遮罩每帧重光栅化也是残余卡顿来源，拖拽期间临时停用 */
+body.is-resizing .Root__nav-bar *,
+body.is-resizing .Root__right-sidebar *,
+body.is-resizing .main-view-container *,
+body.is-resizing .LyricsScrollContainer,
+body.is-resizing .main-nowPlayingView-sectionHeaderSpacing {
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}

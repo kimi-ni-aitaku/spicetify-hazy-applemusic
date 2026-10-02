@@ -5,6 +5,21 @@
   }
 
   const defImage = "https://i.imgur.com/Wl2D0h0.png";
+
+  // 兼容新旧 Spicetify：新版 isPlaying 是属性，旧版是函数，统一走 data.is_paused
+  function getPlayerPaused() {
+    try {
+      if (typeof Spicetify.Player.data?.is_paused === "boolean") {
+        return Spicetify.Player.data.is_paused;
+      }
+      if (typeof Spicetify.Player.isPlaying === "function") {
+        return !Spicetify.Player.isPlaying();
+      }
+      return !Spicetify.Player.isPlaying;
+    } catch (e) {
+      return false;
+    }
+  }
   let startImage = localStorage.getItem("hazy:startupBg") || defImage;
   const toggleInfo = [
     {
@@ -53,9 +68,9 @@
   (function sidebar() {
     if (localStorage.getItem("Hazy Sidebar Activated")) return;
     // Sidebar settings
-    const parsedObject = JSON.parse(
-      localStorage.getItem("spicetify-exp-features")
-    );
+    const parsedRaw = localStorage.getItem("spicetify-exp-features");
+    const parsedObject = parsedRaw ? JSON.parse(parsedRaw) : null;
+    if (!parsedObject || typeof parsedObject !== "object") return;
 
     // Variable if client needs to reload
     let reload = false;
@@ -161,6 +176,7 @@
     } else {
       // When clicking a song from the homepage, songChange is fired with half empty metadata
       setTimeout(onSongChange, 200);
+      return;
     }
 
     updateLyricsPageProperties();
@@ -223,29 +239,38 @@
   }
 
   // Gets the most prominent color in a list of RGB values
+  // 颜色量化桶：把 RGB 每通道量化到 5 位（32 级），桶内取平均色，
+  // 解决 JPEG 封面像素几乎无精确重复导致统计不出主色的问题
   function findColor(rgbList, skipFilters = false) {
-    const colorCount = {};
-    let maxColor = "";
-    let maxCount = 0;
+    const buckets = new Map();
 
     for (let i = 0; i < rgbList.length; i++) {
-      if (
-        !skipFilters &&
-        (isTooDark(rgbList[i]) || isTooCloseToWhite(rgbList[i]))
-      ) {
+      const rgb = rgbList[i];
+      if (!skipFilters && (isTooDark(rgb) || isTooCloseToWhite(rgb))) {
         continue;
       }
-
-      const color = `${rgbList[i].r},${rgbList[i].g},${rgbList[i].b}`;
-      colorCount[color] = (colorCount[color] || 0) + 1;
-
-      if (colorCount[color] > maxCount) {
-        maxColor = color;
-        maxCount = colorCount[color];
+      const key = ((rgb.r >> 3) << 10) | ((rgb.g >> 3) << 5) | (rgb.b >> 3);
+      let b = buckets.get(key);
+      if (!b) {
+        b = { count: 0, r: 0, g: 0, bl: 0 };
+        buckets.set(key, b);
       }
+      b.count++;
+      b.r += rgb.r;
+      b.g += rgb.g;
+      b.bl += rgb.b;
     }
 
-    return maxColor ? rgbToHex(...maxColor.split(",").map(Number)) : null;
+    let best = null;
+    for (const b of buckets.values()) {
+      if (!best || b.count > best.count) best = b;
+    }
+    if (!best) return null;
+    return rgbToHex(
+      Math.round(best.r / best.count),
+      Math.round(best.g / best.count),
+      Math.round(best.bl / best.count)
+    );
   }
 
   // Converts RGB to Hex
@@ -276,10 +301,18 @@
     window.matchMedia = function (query) {
       if (typeof query === "string" && query.includes("70.812rem")) {
         const res = origMatchMedia.call(this, query);
+        // 缓存 bound 函数，保证 add/removeEventListener 引用一致，避免监听器泄漏
+        const boundCache = new Map();
         return new Proxy(res, {
           get(target, prop) {
             if (prop === "matches") return false;
-            return typeof target[prop] === "function" ? target[prop].bind(target) : target[prop];
+            if (typeof target[prop] === "function") {
+              if (!boundCache.has(prop)) {
+                boundCache.set(prop, target[prop].bind(target));
+              }
+              return boundCache.get(prop);
+            }
+            return target[prop];
           }
         });
       }
@@ -340,7 +373,7 @@
         const now = Date.now();
         if (now < optimisticUntil) {
           const dur = Spicetify.Player.getDuration() || 1;
-          const isPaused = Spicetify.Player.isPlaying ? !Spicetify.Player.isPlaying() : false;
+          const isPaused = getPlayerPaused();
           const elapsed = isPaused ? 0 : now - optimisticSetTime;
           const expected = optimisticTargetMs + elapsed;
           const targetPct = expected / dur;
@@ -359,6 +392,17 @@
   }
 
   function installOptimisticSeekWrapper() {
+    // 逃生开关：localStorage 设置 hazy:disableOptimisticSeek=true 可完全跳过内核补丁
+    if (localStorage.getItem("hazy:disableOptimisticSeek") === "true") return;
+    try {
+      installOptimisticSeekWrapperInner();
+    } catch (e) {
+      console.warn("[Hazy] optimistic seek wrapper disabled due to error:", e);
+      localStorage.setItem("hazy:disableOptimisticSeek", "true");
+    }
+  }
+
+  function installOptimisticSeekWrapperInner() {
     const api = Spicetify?.Platform?.PlayerAPI;
     if (!api) {
       setTimeout(installOptimisticSeekWrapper, 50);
@@ -384,7 +428,10 @@
       const origSeek = Spicetify.Player.seek;
       Spicetify.Player.seek = function (count) {
         const duration = Spicetify.Player.getDuration() || 0;
-        const targetMs = count <= 1 && duration > 0 ? Math.round(count * duration) : Math.round(count);
+        // Spicetify.Player.seek 接受毫秒；仅当传入 (0,1) 开区间的小数时才按比例处理
+        const targetMs = (count > 0 && count < 1 && duration > 0)
+          ? Math.round(count * duration)
+          : Math.round(count);
         applyOptimisticSeek(targetMs);
         return origSeek.call(this, count);
       };
@@ -402,7 +449,7 @@
           if (newState && optimisticTargetMs !== null) {
             const now = Date.now();
             if (now < optimisticUntil) {
-              const isPaused = newState.isPaused ?? false;
+              const isPaused = newState.isPaused ?? getPlayerPaused();
               const elapsed = isPaused ? 0 : now - optimisticSetTime;
               const expected = optimisticTargetMs + elapsed;
               const incomingEst = isPaused
@@ -436,7 +483,7 @@
         if (optimisticTargetMs !== null) {
           const now = Date.now();
           if (now < optimisticUntil) {
-            const isPaused = Spicetify.Player.isPlaying ? !Spicetify.Player.isPlaying() : false;
+            const isPaused = getPlayerPaused();
             return Math.round(optimisticTargetMs + (isPaused ? 0 : now - optimisticSetTime));
           }
           optimisticTargetMs = null;
@@ -454,7 +501,7 @@
         if (res && optimisticTargetMs !== null) {
           const now = Date.now();
           if (now < optimisticUntil) {
-            const isPaused = Spicetify.Player.isPlaying ? !Spicetify.Player.isPlaying() : false;
+            const isPaused = getPlayerPaused();
             const elapsed = isPaused ? 0 : now - optimisticSetTime;
             const expected = optimisticTargetMs + elapsed;
             const actual = Number(res.position);
@@ -498,13 +545,12 @@
         "#SpicyLyricsPage .LyricsContent .line, #SpicyLyricsPage .LyricsContent .word, #SpicyLyricsPage .LyricsContent .letter"
       );
       if (!line) return;
-      if (!Spicetify?.Player?.isPlaying?.()) {
-        setTimeout(() => {
-          if (!Spicetify?.Player?.isPlaying?.()) {
-            Spicetify?.Player?.play?.();
-          }
-        }, 50);
-      }
+      if (!getPlayerPaused()) return;
+      setTimeout(() => {
+        if (getPlayerPaused()) {
+          Spicetify?.Player?.play?.();
+        }
+      }, 50);
     },
     true
   );
@@ -1031,7 +1077,7 @@
       }
     }
 
-    const isPlaying = Spicetify.Player.isPlaying();
+    const isPlaying = !getPlayerPaused();
     const playIcon = bar.querySelector(".icon-play");
     const pauseIcon = bar.querySelector(".icon-pause");
     if (playIcon && pauseIcon) {
@@ -1216,7 +1262,7 @@
         pc.appendChild(spacer);
       }
 
-      const isPlaying = Spicetify.Player.isPlaying();
+      const isPlaying = !getPlayerPaused();
       const playIcon = pc.querySelector(".icon-play");
       const pauseIcon = pc.querySelector(".icon-pause");
       if (playIcon && pauseIcon) {
@@ -1366,9 +1412,25 @@
   spicyObserver.observe(document.body, { childList: true, subtree: true });
 
 
-  // Window Resize Zero-Lag Engine (No DOM style recalculation storms)
+  // Window Resize Zero-Lag Engine
+  // 拖拽/缩放窗口期间挂 body.is-resizing，CSS 侧全面停用毛玻璃、阴影与过渡，结束后恢复
   function setupWindowResizeEngine() {
-    // Zoom is locked to 1 in CSS root; no dynamic resize listeners needed.
+    let resizeTimer = null;
+    let classApplied = false;
+
+    function addResizingClass() {
+      if (!classApplied) {
+        classApplied = true;
+        document.body.classList.add("is-resizing");
+      }
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        classApplied = false;
+        document.body.classList.remove("is-resizing");
+      }, 200);
+    }
+
+    window.addEventListener("resize", addResizingClass, { passive: true });
   }
 
   setupWindowResizeEngine();
@@ -1465,7 +1527,7 @@
         for (addedNode of mutation.addedNodes)
           if (addedNode.classList?.contains("lyrics-lyricsContent-provider"))
             setLyricsPageProperties();
-      lyricsObserver.disconnect;
+      lyricsObserver.disconnect();
     }
 
     waitForElement(
@@ -1640,8 +1702,15 @@
       }
       if (hasMenu) break;
     }
-    if (!hasMenu) return;
+    // 同帧内多次 mutation 合并为一次扫描，避免高频 DOM 变化时的重复全量查询
+    if (!hasMenu || menuPruneScheduled) return;
+    menuPruneScheduled = true;
+    requestAnimationFrame(pruneMenus);
+  });
 
+  let menuPruneScheduled = false;
+  function pruneMenus() {
+    menuPruneScheduled = false;
     const menus = document.querySelectorAll('[role="menu"]');
     if (!menus.length) return;
 
@@ -1671,7 +1740,20 @@
         }
       });
     });
-  });
+  }
+
+  // 兜底隐藏 SpicyLyrics 注入到播放栏的按钮（ID/类名随版本变化，CSS 选择器可能漏网）
+  function hideSpicyButtonsInPlaybar() {
+    const bar = document.querySelector(".main-nowPlayingBar, .Root__now-playing-bar");
+    if (!bar) return;
+    bar.querySelectorAll("button").forEach((btn) => {
+      const label = `${btn.id} ${btn.getAttribute("aria-label") || ""} ${btn.getAttribute("title") || ""} ${btn.className || ""}`;
+      if (/spicy/i.test(label)) {
+        btn.style.setProperty("display", "none", "important");
+      }
+    });
+  }
+  setInterval(hideSpicyButtonsInPlaybar, 2000);
 
   menuObserver.observe(document.body, { childList: true, subtree: true });
 })();
